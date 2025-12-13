@@ -1,0 +1,167 @@
+import streamlit as st
+import pandas as pd
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+# --- CONFIGURACIÓN GOOGLE SHEETS ---
+SHEET_NAME = "Torneo CPU"
+
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds_dict = st.secrets["google_service_account"]
+creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(creds_dict), scope)
+client = gspread.authorize(creds)
+
+# --- HOJAS DISPONIBLES ---
+SHEETS = {
+    "Fase de grupos": ("resultados", "goleadores"),
+    "Segunda fase - Campeonato": ("segunda_campeonato", "goleadores_campeonato"),
+    "Segunda fase - Promoción": ("segunda_promocion", "goleadores_promocion")
+}
+
+# --- CREAR HOJAS SI NO EXISTEN ---
+for fase, (res_name, gol_name) in SHEETS.items():
+    try:
+        client.open(SHEET_NAME).worksheet(res_name)
+    except:
+        sh = client.open(SHEET_NAME)
+        ws = sh.add_worksheet(title=res_name, rows="1000", cols="10")
+        ws.append_row(["Grupo", "Fecha", "Equipo", "GolesEquipo", "GolesCPU"])
+    try:
+        client.open(SHEET_NAME).worksheet(gol_name)
+    except:
+        sh = client.open(SHEET_NAME)
+        ws = sh.add_worksheet(title=gol_name, rows="1000", cols="10")
+        ws.append_row(["Equipo", "Jugador", "Goles", "Grupo", "Fecha"])
+
+# --- DATOS TORNEO ---
+grupos = {
+    "Grupo A": ["España", "México", "Australia", "Noruega", "Polonia", "Venezuela", "Ghana", "Albania"],
+    "Grupo B": ["Francia", "Marruecos", "Austria", "Canadá", "Paraguay", "Nigeria", "Eslovenia", "Bosnia"],
+    "Grupo C": ["Argentina", "Alemania", "Corea", "Suecia", "Escocia", "Costa de Marfil", "Islandia", "Angola"],
+    "Grupo D": ["Inglaterra", "Uruguay", "Dinamarca", "Egipto", "Checa", "Zambia", "Jamaica", "Finlandia"],
+    "Grupo E": ["Portugal", "Colombia", "Senegal", "Serbia", "Grecia", "Rumania", "Nueva Zelanda", "Gambia"],
+    "Grupo F": ["Brasil", "Croacia", "Japón", "Ucrania", "Hungría", "Camerún", "Irlanda", "Guinea"],
+    "Grupo G": ["Holanda", "Italia", "Ecuador", "Turquía", "Eslovaquia", "Mali", "Congo", "Haití"],
+    "Grupo H": ["Bélgica", "Estados Unidos", "Suiza", "Gales", "Argelia", "Arabia", "Georgia", "Kosovo"]
+}
+fechas = [f"Fecha {i+1}" for i in range(7)]
+cpu = "CPU"
+
+# --- BANDERAS ---
+def bandera_html(nombre):
+    especiales = {
+        "Escocia": "https://flagcdn.com/w20/gb-sct.png",
+        "Gales": "https://flagcdn.com/w20/gb-wls.png",
+        "Inglaterra": "https://flagcdn.com/w20/gb-eng.png",
+        "Kosovo": "https://flagcdn.com/w20/xk.png"
+    }
+    if nombre in especiales:
+        return f"<img src='{especiales[nombre]}' width='20'> {nombre}"
+    codigos = {
+        "España":"es","México":"mx","Australia":"au","Noruega":"no","Polonia":"pl","Venezuela":"ve","Ghana":"gh","Albania":"al",
+        "Francia":"fr","Marruecos":"ma","Austria":"at","Canadá":"ca","Paraguay":"py","Nigeria":"ng","Eslovenia":"si","Bosnia":"ba",
+        "Argentina":"ar","Alemania":"de","Corea":"kr","Suecia":"se","Costa de Marfil":"ci","Islandia":"is","Angola":"ao",
+        "Uruguay":"uy","Dinamarca":"dk","Egipto":"eg","Checa":"cz","Zambia":"zm","Jamaica":"jm","Finlandia":"fi",
+        "Portugal":"pt","Colombia":"co","Senegal":"sn","Serbia":"rs","Grecia":"gr","Rumania":"ro","Nueva Zelanda":"nz","Gambia":"gm",
+        "Brasil":"br","Croacia":"hr","Japón":"jp","Ucrania":"ua","Hungría":"hu","Camerún":"cm","Irlanda":"ie","Guinea":"gn",
+        "Holanda":"nl","Italia":"it","Ecuador":"ec","Turquía":"tr","Eslovaquia":"sk","Mali":"ml","Congo":"cd","Haití":"ht",
+        "Bélgica":"be","Estados Unidos":"us","Suiza":"ch","Argelia":"dz","Arabia":"sa","Georgia":"ge",
+    }
+    code = codigos.get(nombre)
+    if code:
+        return f"<img src='https://flagcdn.com/w20/{code}.png' width='20'> {nombre}"
+    elif nombre == "CPU":
+        return f"🤖 {nombre}"
+    return nombre
+
+# --- FUNCIONES ---
+def load_sheet(res_name, gol_name):
+    ws_r = client.open(SHEET_NAME).worksheet(res_name)
+    ws_g = client.open(SHEET_NAME).worksheet(gol_name)
+    df_r = pd.DataFrame(ws_r.get_all_records())
+    df_g = pd.DataFrame(ws_g.get_all_records())
+    return df_r, df_g, ws_r, ws_g
+
+def guardar_resultado(ws_results, grupo, fecha, equipo, goles_eq, goles_cpu):
+    ws_results.append_row([grupo, fecha, equipo, goles_eq, goles_cpu])
+
+def guardar_goleadores(ws_scorers, grupo, fecha, equipo, jugadores):
+    for j in jugadores:
+        ws_scorers.append_row([equipo, j, 1, grupo, fecha])
+
+# --- APP ---
+st.set_page_config(page_title="Torneo vs CPU", layout="centered")
+st.title("🏆 Torneo vs CPU")
+
+fase_sel = st.selectbox("Elegí la fase", list(SHEETS.keys()))
+res_name, gol_name = SHEETS[fase_sel]
+df_res, df_gol, ws_results, ws_scorers = load_sheet(res_name, gol_name)
+
+tab1, tab2, tab3 = st.tabs(["📅 Fixture / Resultados", "📊 Tablas", "⚽ Goleadores"])
+
+# --- TAB 1: FIXTURE / RESULTADOS ---
+with tab1:
+    grupo_sel = st.selectbox("Elegí un grupo", list(grupos.keys()))
+    fecha_sel = st.selectbox("Elegí una fecha", fechas)
+    st.markdown("---")
+
+    for equipo in grupos[grupo_sel]:
+        titulo = f"{bandera_html(equipo)} vs {bandera_html(cpu)}"
+        match = df_res[(df_res["Grupo"]==grupo_sel) & (df_res["Fecha"]==fecha_sel) & (df_res["Equipo"]==equipo)]
+        ya_cargado = not match.empty
+        if ya_cargado:
+            goles_eq = int(match.iloc[0]["GolesEquipo"])
+            goles_cpu = int(match.iloc[0]["GolesCPU"])
+        else:
+            goles_eq, goles_cpu = 0, 0
+
+        st.markdown(f"<div style='background-color:{'#f0f0f0' if ya_cargado else 'transparent'};padding:5px;border-radius:6px'>"
+                    f"<b>{titulo}</b></div>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([2,1,1])
+        g_eq = col1.number_input("Goles equipo", 0, 50, goles_eq, key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_eq")
+        g_cpu = col2.number_input("Goles CPU", 0, 50, goles_cpu, key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_cpu")
+        if col3.button("💾", key=f"save_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}"):
+            if not ya_cargado:
+                guardar_resultado(ws_results, grupo_sel, fecha_sel, equipo, g_eq, g_cpu)
+                st.success(f"✅ Guardado: {equipo} {g_eq}-{g_cpu} CPU")
+            else:
+                st.warning("⚠️ Ya cargaste este partido.")
+        with st.expander("Goleadores"):
+            gol_match = df_gol[(df_gol["Equipo"]==equipo) & (df_gol["Grupo"]==grupo_sel) & (df_gol["Fecha"]==fecha_sel)]
+            jugadores_guardados = ", ".join(gol_match["Jugador"].tolist()) if not gol_match.empty else ""
+            goles_txt = st.text_input("Jugadores (separar por coma)", jugadores_guardados, key=f"gols_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}")
+            if st.button("⚽ Guardar goleadores", key=f"save_gol_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}"):
+                jugadores = [j.strip() for j in goles_txt.split(",") if j.strip()]
+                if jugadores:
+                    guardar_goleadores(ws_scorers, grupo_sel, fecha_sel, equipo, jugadores)
+                    st.success("✅ Goleadores guardados")
+
+# --- TAB 2: TABLAS ---
+with tab2:
+    st.subheader(f"📊 Tablas - {fase_sel}")
+    grupo_sel = st.selectbox("Elegí un grupo", list(grupos.keys()))
+    if not df_res.empty:
+        stats = {eq: {"PJ":0,"PG":0,"PE":0,"PP":0,"GF":0,"GC":0,"Pts":0} for eq in grupos[grupo_sel]}
+        for _,r in df_res[df_res["Grupo"]==grupo_sel].iterrows():
+            eq, gf, gc = r["Equipo"], r["GolesEquipo"], r["GolesCPU"]
+            s = stats[eq]
+            s["PJ"]+=1; s["GF"]+=gf; s["GC"]+=gc
+            if gf>gc: s["PG"]+=1; s["Pts"]+=3
+            elif gf==gc: s["PE"]+=1; s["Pts"]+=1
+            else: s["PP"]+=1
+        df = pd.DataFrame.from_dict(stats, orient="index")
+        df["DG"]=df["GF"]-df["GC"]
+        df = df.sort_values(by=["Pts","DG","GF"],ascending=[False,False,False]).reset_index().rename(columns={"index":"Equipo"})
+        df.insert(0,"Pos",range(1,len(df)+1))
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("Todavía no hay resultados cargados en esta fase.")
+
+# --- TAB 3: GOLEADORES ---
+with tab3:
+    st.subheader(f"⚽ Goleadores - {fase_sel}")
+    if not df_gol.empty:
+        df_rank = df_gol.groupby(["Jugador","Equipo"])["Goles"].sum().reset_index().sort_values("Goles",ascending=False)
+        st.dataframe(df_rank, use_container_width=True)
+    else:
+        st.info("Todavía no hay goleadores cargados en esta fase.")
