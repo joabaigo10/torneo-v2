@@ -168,7 +168,12 @@ with tab2:
         df["DG"]=df["GF"]-df["GC"]
         df = df.sort_values(by=["Pts","DG","GF"],ascending=[False,False,False]).reset_index().rename(columns={"index":"Equipo"})
         df.insert(0,"Pos",range(1,len(df)+1))
-        st.dataframe(df, use_container_width=True)
+        df["Equipo"] = df["Equipo"].apply(bandera_html)
+
+        # barra lateral de color
+        df.insert(0," ", df["Pos"].apply(lambda p: f"<div style='width:4px;height:20px;background-color:{'#2ecc71' if p<=5 else '#e74c3c'}'></div>"))
+        tabla_html = df[[" ","Pos","Equipo","Pts","PJ","PG","PE","PP","GF","GC","DG"]].to_html(escape=False,index=False)
+        st.markdown(tabla_html, unsafe_allow_html=True)
     else:
         st.info("Todavía no hay resultados cargados en esta fase.")
 
@@ -177,6 +182,8 @@ with tab3:
     st.subheader(f"⚽ Goleadores - {fase_sel}")
     if not df_gol.empty:
         df_rank = df_gol.groupby(["Jugador","Equipo"])["Goles"].sum().reset_index().sort_values("Goles",ascending=False)
-        st.dataframe(df_rank, use_container_width=True)
+        df_rank["Equipo"] = df_rank["Equipo"].apply(bandera_html)
+        goleadores_html = df_rank.to_html(escape=False,index=False)
+        st.markdown(goleadores_html, unsafe_allow_html=True)
     else:
         st.info("Todavía no hay goleadores cargados en esta fase.")
