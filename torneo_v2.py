@@ -11,27 +11,16 @@ creds_dict = st.secrets["google_service_account"]
 creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(creds_dict), scope)
 client = gspread.authorize(creds)
 
+# --- CACHÉ EN SESIÓN ---
+if "sheet_cache" not in st.session_state:
+    st.session_state.sheet_cache = {}
+
 # --- HOJAS DISPONIBLES ---
 SHEETS = {
     "Fase de grupos": ("resultados", "goleadores"),
     "Segunda fase - Campeonato": ("segunda_campeonato", "goleadores_campeonato"),
     "Segunda fase - Promoción": ("segunda_promocion", "goleadores_promocion")
 }
-
-# --- CREAR HOJAS SI NO EXISTEN ---
-for fase, (res_name, gol_name) in SHEETS.items():
-    try:
-        client.open(SHEET_NAME).worksheet(res_name)
-    except:
-        sh = client.open(SHEET_NAME)
-        ws = sh.add_worksheet(title=res_name, rows="1000", cols="10")
-        ws.append_row(["Grupo", "Fecha", "Equipo", "GolesEquipo", "GolesCPU"])
-    try:
-        client.open(SHEET_NAME).worksheet(gol_name)
-    except:
-        sh = client.open(SHEET_NAME)
-        ws = sh.add_worksheet(title=gol_name, rows="1000", cols="10")
-        ws.append_row(["Equipo", "Jugador", "Goles", "Grupo", "Fecha"])
 
 # --- DATOS TORNEO ---
 grupos = {
@@ -76,18 +65,40 @@ def bandera_html(nombre):
 
 # --- FUNCIONES ---
 def load_sheet(res_name, gol_name):
-    ws_r = client.open(SHEET_NAME).worksheet(res_name)
-    ws_g = client.open(SHEET_NAME).worksheet(gol_name)
+    """Carga datos de Google Sheets con caché"""
+    cache_key = f"{res_name}_{gol_name}"
+    if cache_key in st.session_state.sheet_cache:
+        return st.session_state.sheet_cache[cache_key]
+
+    sh = client.open(SHEET_NAME)
+    # cargar resultados
+    try:
+        ws_r = sh.worksheet(res_name)
+    except:
+        ws_r = sh.add_worksheet(title=res_name, rows="1000", cols="10")
+        ws_r.append_row(["Grupo", "Fecha", "Equipo", "GolesEquipo", "GolesCPU"])
+    # cargar goleadores
+    try:
+        ws_g = sh.worksheet(gol_name)
+    except:
+        ws_g = sh.add_worksheet(title=gol_name, rows="1000", cols="10")
+        ws_g.append_row(["Equipo", "Jugador", "Goles", "Grupo", "Fecha"])
+
     df_r = pd.DataFrame(ws_r.get_all_records())
     df_g = pd.DataFrame(ws_g.get_all_records())
+
+    st.session_state.sheet_cache[cache_key] = (df_r, df_g, ws_r, ws_g)
     return df_r, df_g, ws_r, ws_g
+
 
 def guardar_resultado(ws_results, grupo, fecha, equipo, goles_eq, goles_cpu):
     ws_results.append_row([grupo, fecha, equipo, goles_eq, goles_cpu])
 
+
 def guardar_goleadores(ws_scorers, grupo, fecha, equipo, jugadores):
     for j in jugadores:
         ws_scorers.append_row([equipo, j, 1, grupo, fecha])
+
 
 # --- APP ---
 st.set_page_config(page_title="Torneo vs CPU", layout="centered")
@@ -95,80 +106,45 @@ st.title("🏆 Torneo vs CPU")
 
 fase_sel = st.selectbox("Elegí la fase", list(SHEETS.keys()))
 res_name, gol_name = SHEETS[fase_sel]
+
+# Botón para refrescar manualmente
+if st.button("🔄 Actualizar datos"):
+    st.session_state.sheet_cache = {}
+    st.rerun()
+
 df_res, df_gol, ws_results, ws_scorers = load_sheet(res_name, gol_name)
 
 tab1, tab2, tab3 = st.tabs(["📅 Fixture / Resultados", "📊 Tablas", "⚽ Goleadores"])
 
 # --- TAB 1: FIXTURE / RESULTADOS ---
 with tab1:
-    grupo_sel = st.selectbox(
-        "Elegí un grupo",
-        list(grupos.keys()),
-        key="selector_grupo_fixture"
-    )
-
-    fecha_sel = st.selectbox(
-        "Elegí una fecha",
-        fechas,
-        key="selector_fecha_fixture"
-    )
-
+    grupo_sel = st.selectbox("Elegí un grupo", list(grupos.keys()), key="grupo_fixture")
+    fecha_sel = st.selectbox("Elegí una fecha", fechas, key="fecha_fixture")
     st.markdown("---")
 
     for equipo in grupos[grupo_sel]:
         titulo = f"{bandera_html(equipo)} vs {bandera_html(cpu)}"
-        match = df_res[(df_res["Grupo"] == grupo_sel) & (df_res["Fecha"] == fecha_sel) & (df_res["Equipo"] == equipo)]
+        match = df_res[(df_res["Grupo"]==grupo_sel) & (df_res["Fecha"]==fecha_sel) & (df_res["Equipo"]==equipo)]
         ya_cargado = not match.empty
+        goles_eq = int(match.iloc[0]["GolesEquipo"]) if ya_cargado else 0
+        goles_cpu = int(match.iloc[0]["GolesCPU"]) if ya_cargado else 0
 
-        if ya_cargado:
-            goles_eq = int(match.iloc[0]["GolesEquipo"])
-            goles_cpu = int(match.iloc[0]["GolesCPU"])
-        else:
-            goles_eq, goles_cpu = 0, 0
-
-        st.markdown(
-            f"<div style='background-color:{'#f0f0f0' if ya_cargado else 'transparent'};"
-            f"padding:5px;border-radius:6px'><b>{titulo}</b></div>",
-            unsafe_allow_html=True
-        )
-
-        col1, col2, col3 = st.columns([2, 1, 1])
-
-        g_eq = col1.number_input(
-            "Goles equipo",
-            0, 50,
-            goles_eq,
-            key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_eq"
-        )
-
-        g_cpu = col2.number_input(
-            "Goles CPU",
-            0, 50,
-            goles_cpu,
-            key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_cpu"
-        )
-
+        st.markdown(f"<div style='background-color:{'#f0f0f0' if ya_cargado else 'transparent'};"
+                    f"padding:5px;border-radius:6px'><b>{titulo}</b></div>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns([2,1,1])
+        g_eq = col1.number_input("Goles equipo", 0, 50, goles_eq, key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_eq")
+        g_cpu = col2.number_input("Goles CPU", 0, 50, goles_cpu, key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_cpu")
         if col3.button("💾", key=f"save_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}"):
             if not ya_cargado:
                 guardar_resultado(ws_results, grupo_sel, fecha_sel, equipo, g_eq, g_cpu)
                 st.success(f"✅ Guardado: {equipo} {g_eq}-{g_cpu} CPU")
             else:
                 st.warning("⚠️ Ya cargaste este partido.")
-
-        with st.expander("Goleadores", expanded=False):
-            gol_match = df_gol[
-                (df_gol["Equipo"] == equipo)
-                & (df_gol["Grupo"] == grupo_sel)
-                & (df_gol["Fecha"] == fecha_sel)
-            ]
+        with st.expander("Goleadores"):
+            gol_match = df_gol[(df_gol["Equipo"]==equipo) & (df_gol["Grupo"]==grupo_sel) & (df_gol["Fecha"]==fecha_sel)]
             jugadores_guardados = ", ".join(gol_match["Jugador"].tolist()) if not gol_match.empty else ""
-
-            goles_txt = st.text_input(
-                "Jugadores (separar por coma)",
-                jugadores_guardados,
-                key=f"gols_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}"
-            )
-
+            goles_txt = st.text_input("Jugadores (separar por coma)", jugadores_guardados,
+                                      key=f"gols_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}")
             if st.button("⚽ Guardar goleadores", key=f"save_gol_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}"):
                 jugadores = [j.strip() for j in goles_txt.split(",") if j.strip()]
                 if jugadores:
@@ -178,10 +154,10 @@ with tab1:
 # --- TAB 2: TABLAS ---
 with tab2:
     st.subheader(f"📊 Tablas - {fase_sel}")
-    grupo_sel = st.selectbox("Elegí un grupo", list(grupos.keys()))
+    grupo_tabla = st.selectbox("Elegí un grupo", list(grupos.keys()), key="grupo_tabla")
     if not df_res.empty:
-        stats = {eq: {"PJ":0,"PG":0,"PE":0,"PP":0,"GF":0,"GC":0,"Pts":0} for eq in grupos[grupo_sel]}
-        for _,r in df_res[df_res["Grupo"]==grupo_sel].iterrows():
+        stats = {eq: {"PJ":0,"PG":0,"PE":0,"PP":0,"GF":0,"GC":0,"Pts":0} for eq in grupos[grupo_tabla]}
+        for _,r in df_res[df_res["Grupo"]==grupo_tabla].iterrows():
             eq, gf, gc = r["Equipo"], r["GolesEquipo"], r["GolesCPU"]
             s = stats[eq]
             s["PJ"]+=1; s["GF"]+=gf; s["GC"]+=gc
