@@ -101,35 +101,74 @@ tab1, tab2, tab3 = st.tabs(["📅 Fixture / Resultados", "📊 Tablas", "⚽ Gol
 
 # --- TAB 1: FIXTURE / RESULTADOS ---
 with tab1:
-    grupo_sel = st.selectbox("Elegí un grupo", list(grupos.keys()))
-    fecha_sel = st.selectbox("Elegí una fecha", fechas)
+    grupo_sel = st.selectbox(
+        "Elegí un grupo",
+        list(grupos.keys()),
+        key="selector_grupo_fixture"
+    )
+
+    fecha_sel = st.selectbox(
+        "Elegí una fecha",
+        fechas,
+        key="selector_fecha_fixture"
+    )
+
     st.markdown("---")
 
     for equipo in grupos[grupo_sel]:
         titulo = f"{bandera_html(equipo)} vs {bandera_html(cpu)}"
-        match = df_res[(df_res["Grupo"]==grupo_sel) & (df_res["Fecha"]==fecha_sel) & (df_res["Equipo"]==equipo)]
+        match = df_res[(df_res["Grupo"] == grupo_sel) & (df_res["Fecha"] == fecha_sel) & (df_res["Equipo"] == equipo)]
         ya_cargado = not match.empty
+
         if ya_cargado:
             goles_eq = int(match.iloc[0]["GolesEquipo"])
             goles_cpu = int(match.iloc[0]["GolesCPU"])
         else:
             goles_eq, goles_cpu = 0, 0
 
-        st.markdown(f"<div style='background-color:{'#f0f0f0' if ya_cargado else 'transparent'};padding:5px;border-radius:6px'>"
-                    f"<b>{titulo}</b></div>", unsafe_allow_html=True)
-        col1, col2, col3 = st.columns([2,1,1])
-        g_eq = col1.number_input("Goles equipo", 0, 50, goles_eq, key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_eq")
-        g_cpu = col2.number_input("Goles CPU", 0, 50, goles_cpu, key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_cpu")
+        st.markdown(
+            f"<div style='background-color:{'#f0f0f0' if ya_cargado else 'transparent'};"
+            f"padding:5px;border-radius:6px'><b>{titulo}</b></div>",
+            unsafe_allow_html=True
+        )
+
+        col1, col2, col3 = st.columns([2, 1, 1])
+
+        g_eq = col1.number_input(
+            "Goles equipo",
+            0, 50,
+            goles_eq,
+            key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_eq"
+        )
+
+        g_cpu = col2.number_input(
+            "Goles CPU",
+            0, 50,
+            goles_cpu,
+            key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_cpu"
+        )
+
         if col3.button("💾", key=f"save_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}"):
             if not ya_cargado:
                 guardar_resultado(ws_results, grupo_sel, fecha_sel, equipo, g_eq, g_cpu)
                 st.success(f"✅ Guardado: {equipo} {g_eq}-{g_cpu} CPU")
             else:
                 st.warning("⚠️ Ya cargaste este partido.")
-        with st.expander("Goleadores"):
-            gol_match = df_gol[(df_gol["Equipo"]==equipo) & (df_gol["Grupo"]==grupo_sel) & (df_gol["Fecha"]==fecha_sel)]
+
+        with st.expander("Goleadores", expanded=False):
+            gol_match = df_gol[
+                (df_gol["Equipo"] == equipo)
+                & (df_gol["Grupo"] == grupo_sel)
+                & (df_gol["Fecha"] == fecha_sel)
+            ]
             jugadores_guardados = ", ".join(gol_match["Jugador"].tolist()) if not gol_match.empty else ""
-            goles_txt = st.text_input("Jugadores (separar por coma)", jugadores_guardados, key=f"gols_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}")
+
+            goles_txt = st.text_input(
+                "Jugadores (separar por coma)",
+                jugadores_guardados,
+                key=f"gols_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}"
+            )
+
             if st.button("⚽ Guardar goleadores", key=f"save_gol_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}"):
                 jugadores = [j.strip() for j in goles_txt.split(",") if j.strip()]
                 if jugadores:
