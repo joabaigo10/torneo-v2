@@ -181,7 +181,6 @@ with tab2:
 with tab3:
     st.subheader(f"⚽ Goleadores - {fase_sel}")
 
-    # Opción para ver todos los goleadores juntos
     vista_sel = st.radio(
         "Ver:",
         ["Esta fase", "General"],
@@ -190,7 +189,7 @@ with tab3:
     )
 
     if vista_sel == "General":
-        # Mostrar todos los goleadores (todas las fases)
+        # Unir los goleadores de todas las fases
         hojas = [
             ("resultados", "goleadores"),
             ("segunda_campeonato", "goleadores_campeonato"),
@@ -199,25 +198,37 @@ with tab3:
         frames = []
         for r, g in hojas:
             try:
-                df_g, _, _, _ = load_sheet(r, g)
-                frames.append(df_g)
-            except:
+                _, df_g, _, _ = load_sheet(r, g)  # acá está el cambio importante
+                if not df_g.empty:
+                    frames.append(df_g)
+            except Exception as e:
+                print("Error al leer hoja", g, e)
                 continue
-        df_all = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-        if not df_all.empty:
-            df_rank = df_all.groupby(["Jugador", "Equipo"])["Goles"].sum().reset_index().sort_values("Goles", ascending=False)
+
+        if frames:
+            df_all = pd.concat(frames, ignore_index=True)
+            df_rank = (
+                df_all.groupby(["Jugador", "Equipo"])["Goles"]
+                .sum()
+                .reset_index()
+                .sort_values("Goles", ascending=False)
+            )
             df_rank["Equipo"] = df_rank["Equipo"].apply(bandera_html)
             goleadores_html = df_rank.to_html(escape=False, index=False)
             st.markdown(goleadores_html, unsafe_allow_html=True)
         else:
             st.info("Todavía no hay goleadores cargados en ninguna fase.")
     else:
-        # Mostrar solo los de la fase actual
+        # Solo los goleadores de la fase actual
         if not df_gol.empty:
-            df_rank = df_gol.groupby(["Jugador", "Equipo"])["Goles"].sum().reset_index().sort_values("Goles", ascending=False)
+            df_rank = (
+                df_gol.groupby(["Jugador", "Equipo"])["Goles"]
+                .sum()
+                .reset_index()
+                .sort_values("Goles", ascending=False)
+            )
             df_rank["Equipo"] = df_rank["Equipo"].apply(bandera_html)
             goleadores_html = df_rank.to_html(escape=False, index=False)
             st.markdown(goleadores_html, unsafe_allow_html=True)
         else:
             st.info("Todavía no hay goleadores cargados en esta fase.")
-
