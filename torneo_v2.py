@@ -19,7 +19,8 @@ if "sheet_cache" not in st.session_state:
 SHEETS = {
     "Fase de grupos": ("resultados", "goleadores"),
     "Segunda fase - Campeonato": ("segunda_campeonato", "goleadores_campeonato"),
-    "Segunda fase - Promoción": ("segunda_promocion", "goleadores_promocion")
+    "Segunda fase - Promoción": ("segunda_promocion", "goleadores_promocion"),
+    "Zona Promoción": ("promocion_resultados", "promocion_goleadores")
 }
 
 # --- DATOS TORNEO ---
@@ -33,8 +34,22 @@ grupos = {
     "Grupo G": ["Holanda", "Italia", "Ecuador", "Turquía", "Eslovaquia", "Mali", "Congo", "Haití"],
     "Grupo H": ["Bélgica", "Estados Unidos", "Suiza", "Gales", "Argelia", "Arabia", "Georgia", "Kosovo"]
 }
+
+zona_promocion = {
+    "Zona A": ["España", "Surinam", "Senegal", "Eslovaquia"],
+    "Zona B": ["México", "Cabo Verde", "Chile", "Bélgica"],
+    "Zona C": ["Venezuela", "Angola", "Croacia", "Kosovo"],
+    "Zona D": ["Austria", "Alemania", "Burkina Faso", "Ecuador"],
+    "Zona E": ["Bosnia", "Jamaica", "Camerún", "Arabia"],
+    "Zona F": ["Paraguay", "Islandia", "Guinea", "Haití"]
+}
+
 fechas = [f"Fecha {i+1}" for i in range(7)]
+fechas_promocion = [f"Fecha {i+1}" for i in range(4)]
+
 cpu = "CPU"
+
+
 
 # --- BANDERAS ---
 def bandera_html(nombre):
@@ -118,8 +133,17 @@ tab1, tab2, tab3 = st.tabs(["📅 Fixture / Resultados", "📊 Tablas", "⚽ Gol
 
 # --- TAB 1: FIXTURE / RESULTADOS ---
 with tab1:
-    grupo_sel = st.selectbox("Elegí un grupo", list(grupos.keys()), key="grupo_fixture")
-    fecha_sel = st.selectbox("Elegí una fecha", fechas, key="fecha_fixture")
+    # Detectar si es Zona Promoción
+    if fase_sel == "Zona Promoción":
+        grupos_activos = zona_promocion
+        fechas_activas = fechas_promocion
+    else:
+        grupos_activos = grupos
+        fechas_activas = fechas
+
+    grupo_sel = st.selectbox("Elegí un grupo", list(grupos_activos.keys()), key="grupo_fixture")
+    fecha_sel = st.selectbox("Elegí una fecha", fechas_activas, key="fecha_fixture")
+
     st.markdown("---")
 
     for equipo in grupos[grupo_sel]:
@@ -171,7 +195,14 @@ with tab2:
         df["Equipo"] = df["Equipo"].apply(bandera_html)
 
         # barra lateral de color
-        df.insert(0," ", df["Pos"].apply(lambda p: f"<div style='width:4px;height:20px;background-color:{'#2ecc71' if p<=5 else '#e74c3c'}'></div>"))
+        # barra lateral de color (ajustada por fase)
+        if fase_sel == "Zona Promoción":
+            color = df["Pos"].apply(lambda p: "#2ecc71" if p <= 2 else "#e74c3c")
+        else:
+            color = df["Pos"].apply(lambda p: "#2ecc71" if p <= 5 else "#e74c3c")
+
+        df.insert(0, " ", color.apply(lambda c: f"<div style='width:4px;height:20px;background-color:{c}'></div>"))
+
         tabla_html = df[[" ","Pos","Equipo","Pts","PJ","PG","PE","PP","GF","GC","DG"]].to_html(escape=False,index=False)
         st.markdown(tabla_html, unsafe_allow_html=True)
     else:
