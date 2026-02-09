@@ -19,7 +19,6 @@ if "sheet_cache" not in st.session_state:
 SHEETS = {
     "Fase de grupos": ("resultados", "goleadores"),
     "Segunda fase - Campeonato": ("segunda_campeonato", "goleadores_campeonato"),
-    "Segunda fase - Promoción": ("segunda_promocion", "goleadores_promocion"),
     "Zona Promoción": ("promocion_resultados", "promocion_goleadores")
 }
 
