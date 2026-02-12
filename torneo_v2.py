@@ -223,7 +223,7 @@ with tab2:
     grupo_tabla = st.selectbox("Elegí un grupo", list(grupos_activos.keys()), key="grupo_tabla")
 
     if not df_res.empty:
-        stats = {eq: {"PJ":0,"PG":0,"PE":0,"PP":0,"GF":0,"GC":0,"Pts":0} for eq in grupos[grupo_tabla]}
+        stats = {eq: {"PJ":0,"PG":0,"PE":0,"PP":0,"GF":0,"GC":0,"Pts":0} for eq in grupos_activos[grupo_tabla]}
         for _,r in df_res[df_res["Grupo"]==grupo_tabla].iterrows():
             eq, gf, gc = r["Equipo"], r["GolesEquipo"], r["GolesCPU"]
             s = stats[eq]
