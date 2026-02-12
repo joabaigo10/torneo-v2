@@ -150,10 +150,11 @@ with tab1:
 
     # Buscar si ya tiene resultado cargado
         match = df_res[
-            (df_res["Grupo"] == grupo_sel)
-            & (df_res["Fecha"] == fecha_sel)
-            & (df_res["Equipo"] == equipo)
+            (df_res["Grupo"].astype(str).str.strip().str.lower() == grupo_sel.lower())
+            & (df_res["Fecha"].astype(str).str.strip().str.lower() == fecha_sel.lower())
+            & (df_res["Equipo"].astype(str).str.strip().str.lower() == equipo.lower())
         ]
+
 
         if match.empty:
             goles_eq, goles_cpu, ya_cargado = 0, 0, False
