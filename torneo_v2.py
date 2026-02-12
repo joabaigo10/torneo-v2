@@ -231,46 +231,66 @@ with tab1:
 
 
 # --- TAB 2: TABLAS ---
+# --- TAB 2: TABLAS ---
 with tab2:
     st.subheader(f"📊 Tablas - {fase_sel}")
+
+    # Detectar zona activa según la fase
     if fase_sel == "Zona Promoción":
         grupos_activos = zona_promocion
+    elif fase_sel == "Zona Campeonato":
+        grupos_activos = zona_campeonato
     else:
         grupos_activos = grupos
 
     grupo_tabla = st.selectbox("Elegí un grupo", list(grupos_activos.keys()), key="grupo_tabla")
 
     if not df_res.empty:
-        stats = {eq: {"PJ":0,"PG":0,"PE":0,"PP":0,"GF":0,"GC":0,"Pts":0} for eq in grupos_activos[grupo_tabla]}
-        for _,r in df_res[df_res["Grupo"]==grupo_tabla].iterrows():
-            eq, gf, gc = r["Equipo"], r["GolesEquipo"], r["GolesCPU"]
-            s = stats[eq]
-            s["PJ"]+=1; s["GF"]+=gf; s["GC"]+=gc
-            if gf>gc: s["PG"]+=1; s["Pts"]+=3
-            elif gf==gc: s["PE"]+=1; s["Pts"]+=1
-            else: s["PP"]+=1
+        # Crear estructura de estadísticas vacía
+        stats = {eq: {"PJ": 0, "PG": 0, "PE": 0, "PP": 0, "GF": 0, "GC": 0, "Pts": 0}
+                 for eq in grupos_activos[grupo_tabla]}
+
+        # Filtrar por grupo actual (asegurando coincidencia de texto)
+        for _, r in df_res[df_res["Grupo"].astype(str).str.strip().str.lower() == grupo_tabla.lower()].iterrows():
+            eq, gf, gc = r["Equipo"], int(r["GolesEquipo"]), int(r["GolesCPU"])
+            s = stats.get(eq)
+            if s is not None:
+                s["PJ"] += 1
+                s["GF"] += gf
+                s["GC"] += gc
+                if gf > gc:
+                    s["PG"] += 1
+                    s["Pts"] += 3
+                elif gf == gc:
+                    s["PE"] += 1
+                    s["Pts"] += 1
+                else:
+                    s["PP"] += 1
+
+        # Crear DataFrame de tabla
         df = pd.DataFrame.from_dict(stats, orient="index")
-        df["DG"]=df["GF"]-df["GC"]
-        df = df.sort_values(by=["Pts","DG","GF"],ascending=[False,False,False]).reset_index().rename(columns={"index":"Equipo"})
-        df.insert(0,"Pos",range(1,len(df)+1))
+        df["DG"] = df["GF"] - df["GC"]
+        df = df.sort_values(by=["Pts", "DG", "GF"], ascending=[False, False, False]).reset_index().rename(columns={"index": "Equipo"})
+        df.insert(0, "Pos", range(1, len(df) + 1))
         df["Equipo"] = df["Equipo"].apply(bandera_html)
 
-        # barra lateral de color
-        # barra lateral de color (ajustada por fase)
+        # Definir color según fase
         if fase_sel == "Zona Promoción":
             color = df["Pos"].apply(lambda p: "#2ecc71" if p <= 2 else "#e74c3c")
-        elif fase_sel == "Segunda fase - Campeonato":
-            color = df["Pos"].apply(lambda p: "#2ecc71" if p <= 3 else "#e74c3c")
+        elif fase_sel == "Zona Campeonato":
+            color = df["Pos"].apply(lambda p: "#2ecc71" if p <= 3 else ("#e74c3c" if p in [4, 5] else "transparent"))
         else:
             color = df["Pos"].apply(lambda p: "#2ecc71" if p <= 5 else "#e74c3c")
 
-
+        # Agregar barra de color lateral
         df.insert(0, " ", color.apply(lambda c: f"<div style='width:4px;height:20px;background-color:{c}'></div>"))
 
-        tabla_html = df[[" ","Pos","Equipo","Pts","PJ","PG","PE","PP","GF","GC","DG"]].to_html(escape=False,index=False)
+        tabla_html = df[[" ", "Pos", "Equipo", "Pts", "PJ", "PG", "PE", "PP", "GF", "GC", "DG"]].to_html(escape=False, index=False)
         st.markdown(tabla_html, unsafe_allow_html=True)
+
     else:
         st.info("Todavía no hay resultados cargados en esta fase.")
+
 
 # --- TAB 3: GOLEADORES ---
 with tab3:
