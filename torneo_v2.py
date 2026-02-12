@@ -30,7 +30,7 @@ grupos = {
     "Grupo D": ["Inglaterra", "Uruguay", "Dinamarca", "Surinam", "Checa", "Cabo Verde", "Jamaica", "Finlandia"],
     "Grupo E": ["Portugal", "Colombia", "Senegal", "Serbia", "Grecia", "Rumania", "Chile", "Burkina Faso"],
     "Grupo F": ["Brasil", "Croacia", "Japón", "Ucrania", "Hungría", "Camerún", "Irlanda", "Guinea"],
-    "Grupo G": ["Paises Bajos", "Italia", "Ecuador", "Turquía", "Eslovaquia", "Mali", "Congo", "Haití"],
+    "Grupo G": ["Países Bajos", "Italia", "Ecuador", "Turquía", "Eslovaquia", "Mali", "Congo", "Haití"],
     "Grupo H": ["Bélgica", "Estados Unidos", "Suiza", "Gales", "Argelia", "Arabia", "Georgia", "Kosovo"]
 }
 
@@ -80,7 +80,7 @@ def bandera_html(nombre):
         "Uruguay":"uy","Dinamarca":"dk","Surinam":"sr","Checa":"cz","Cabo Verde":"cv","Jamaica":"jm","Finlandia":"fi",
         "Portugal":"pt","Colombia":"co","Senegal":"sn","Serbia":"rs","Grecia":"gr","Rumania":"ro","Chile":"cl","Burkina Faso":"bf",
         "Brasil":"br","Croacia":"hr","Japón":"jp","Ucrania":"ua","Hungría":"hu","Camerún":"cm","Irlanda":"ie","Guinea":"gn",
-        "Paises Bajos":"nl","Italia":"it","Ecuador":"ec","Turquía":"tr","Eslovaquia":"sk","Mali":"ml","Congo":"cd","Haití":"ht",
+        "Países Bajos":"nl","Italia":"it","Ecuador":"ec","Turquía":"tr","Eslovaquia":"sk","Mali":"ml","Congo":"cd","Haití":"ht",
         "Bélgica":"be","Estados Unidos":"us","Suiza":"ch","Argelia":"dz","Arabia":"sa","Georgia":"ge",
     }
     code = codigos.get(nombre)
