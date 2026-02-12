@@ -187,22 +187,29 @@ with tab1:
                 st.warning("⚠️ Ya cargaste este partido.")
 
         with st.expander("Goleadores"):
-            gol_match = df_gol[
-                (df_gol["Equipo"] == equipo)
-                & (df_gol["Grupo"] == grupo_sel)
-                & (df_gol["Fecha"] == fecha_sel)
-            ]
-            jugadores_guardados = ", ".join(gol_match["Jugador"].tolist()) if not gol_match.empty else ""
+    # Si el df_gol no tiene columnas (hoja vacía), evitar error
+            if not all(c in df_gol.columns for c in ["Equipo", "Jugador", "Goles", "Grupo", "Fecha"]):
+                 jugadores_guardados = ""
+            else:
+                gol_match = df_gol[
+                    (df_gol["Equipo"] == equipo)
+                    & (df_gol["Grupo"] == grupo_sel)
+                    & (df_gol["Fecha"] == fecha_sel)
+                ]
+                jugadores_guardados = ", ".join(gol_match["Jugador"].tolist()) if not gol_match.empty else ""
+
             goles_txt = st.text_input(
                 "Jugadores (separar por coma)",
                 jugadores_guardados,
                 key=f"gols_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}",
             )
+
             if st.button("⚽ Guardar goleadores", key=f"save_gol_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}"):
                 jugadores = [j.strip() for j in goles_txt.split(",") if j.strip()]
                 if jugadores:
                     guardar_goleadores(ws_scorers, grupo_sel, fecha_sel, equipo, jugadores)
                     st.success("✅ Goleadores guardados")
+
 
 
 # --- TAB 2: TABLAS ---
