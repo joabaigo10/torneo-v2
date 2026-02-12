@@ -147,32 +147,63 @@ with tab1:
 
     for equipo in grupos_activos[grupo_sel]:
         titulo = f"{bandera_html(equipo)} vs {bandera_html(cpu)}"
-        match = df_res[(df_res["Grupo"]==grupo_sel) & (df_res["Fecha"]==fecha_sel) & (df_res["Equipo"]==equipo)]
-        ya_cargado = not match.empty
-        goles_eq = int(match.iloc[0]["GolesEquipo"]) if ya_cargado else 0
-        goles_cpu = int(match.iloc[0]["GolesCPU"]) if ya_cargado else 0
 
-        st.markdown(f"<div style='background-color:{'#f0f0f0' if ya_cargado else 'transparent'};"
-                    f"padding:5px;border-radius:6px'><b>{titulo}</b></div>", unsafe_allow_html=True)
-        col1, col2, col3 = st.columns([2,1,1])
-        g_eq = col1.number_input("Goles equipo", 0, 50, goles_eq, key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_eq")
-        g_cpu = col2.number_input("Goles CPU", 0, 50, goles_cpu, key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_cpu")
+    # Buscar si ya tiene resultado cargado
+        match = df_res[
+            (df_res["Grupo"] == grupo_sel)
+            & (df_res["Fecha"] == fecha_sel)
+            & (df_res["Equipo"] == equipo)
+        ]
+
+        if match.empty:
+            goles_eq, goles_cpu, ya_cargado = 0, 0, False
+        else:
+            goles_eq = int(match.iloc[0].get("GolesEquipo", 0))
+            goles_cpu = int(match.iloc[0].get("GolesCPU", 0))
+            ya_cargado = True
+
+    # Mostrar la fila (gris si ya cargado)
+        st.markdown(
+            f"<div style='background-color:{'#f0f0f0' if ya_cargado else 'transparent'};"
+            f"padding:5px;border-radius:6px'><b>{titulo}</b></div>",
+            unsafe_allow_html=True
+        )
+
+        col1, col2, col3 = st.columns([2, 1, 1])
+        g_eq = col1.number_input(
+            "Goles equipo", 0, 50, goles_eq,
+            key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_eq"
+        )
+        g_cpu = col2.number_input(
+            "Goles CPU", 0, 50, goles_cpu,
+            key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_cpu"
+        )
+
         if col3.button("💾", key=f"save_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}"):
             if not ya_cargado:
                 guardar_resultado(ws_results, grupo_sel, fecha_sel, equipo, g_eq, g_cpu)
                 st.success(f"✅ Guardado: {equipo} {g_eq}-{g_cpu} CPU")
             else:
                 st.warning("⚠️ Ya cargaste este partido.")
+
         with st.expander("Goleadores"):
-            gol_match = df_gol[(df_gol["Equipo"]==equipo) & (df_gol["Grupo"]==grupo_sel) & (df_gol["Fecha"]==fecha_sel)]
+            gol_match = df_gol[
+                (df_gol["Equipo"] == equipo)
+                & (df_gol["Grupo"] == grupo_sel)
+                & (df_gol["Fecha"] == fecha_sel)
+            ]
             jugadores_guardados = ", ".join(gol_match["Jugador"].tolist()) if not gol_match.empty else ""
-            goles_txt = st.text_input("Jugadores (separar por coma)", jugadores_guardados,
-                                      key=f"gols_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}")
+            goles_txt = st.text_input(
+                "Jugadores (separar por coma)",
+                jugadores_guardados,
+                key=f"gols_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}",
+            )
             if st.button("⚽ Guardar goleadores", key=f"save_gol_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}"):
                 jugadores = [j.strip() for j in goles_txt.split(",") if j.strip()]
                 if jugadores:
                     guardar_goleadores(ws_scorers, grupo_sel, fecha_sel, equipo, jugadores)
                     st.success("✅ Goleadores guardados")
+
 
 # --- TAB 2: TABLAS ---
 with tab2:
