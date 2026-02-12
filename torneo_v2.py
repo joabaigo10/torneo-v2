@@ -92,30 +92,45 @@ def bandera_html(nombre):
 
 # --- FUNCIONES ---
 def load_sheet(res_name, gol_name):
-    """Carga datos de Google Sheets con caché"""
+    """Carga datos de Google Sheets con validación automática de columnas"""
     cache_key = f"{res_name}_{gol_name}"
     if cache_key in st.session_state.sheet_cache:
         return st.session_state.sheet_cache[cache_key]
 
     sh = client.open(SHEET_NAME)
-    # cargar resultados
+
+    # --- RESULTADOS ---
     try:
         ws_r = sh.worksheet(res_name)
     except:
         ws_r = sh.add_worksheet(title=res_name, rows="1000", cols="10")
-        ws_r.append_row(["Grupo", "Fecha", "Equipo", "GolesEquipo", "GolesCPU"])
-    # cargar goleadores
+
+    # Verificar encabezados correctos
+    expected_cols_r = ["Grupo", "Fecha", "Equipo", "GolesEquipo", "GolesCPU"]
+    first_row_r = ws_r.row_values(1)
+    if first_row_r != expected_cols_r:
+        ws_r.clear()
+        ws_r.append_row(expected_cols_r)
+
+    # --- GOLEADORES ---
     try:
         ws_g = sh.worksheet(gol_name)
     except:
         ws_g = sh.add_worksheet(title=gol_name, rows="1000", cols="10")
-        ws_g.append_row(["Equipo", "Jugador", "Goles", "Grupo", "Fecha"])
 
+    expected_cols_g = ["Equipo", "Jugador", "Goles", "Grupo", "Fecha"]
+    first_row_g = ws_g.row_values(1)
+    if first_row_g != expected_cols_g:
+        ws_g.clear()
+        ws_g.append_row(expected_cols_g)
+
+    # --- Cargar DataFrames ---
     df_r = pd.DataFrame(ws_r.get_all_records())
     df_g = pd.DataFrame(ws_g.get_all_records())
 
     st.session_state.sheet_cache[cache_key] = (df_r, df_g, ws_r, ws_g)
     return df_r, df_g, ws_r, ws_g
+
 
 
 def guardar_resultado(ws_results, grupo, fecha, equipo, goles_eq, goles_cpu):
