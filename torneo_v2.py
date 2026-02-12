@@ -18,7 +18,7 @@ if "sheet_cache" not in st.session_state:
 # --- HOJAS DISPONIBLES ---
 SHEETS = {
     "Fase de grupos": ("resultados", "goleadores"),
-    "Segunda fase - Campeonato": ("segunda_campeonato", "goleadores_campeonato"),
+    "Zona Campeonato": ("segunda_campeonato", "goleadores_campeonato"),
     "Zona Promoción": ("promocion_resultados", "promocion_goleadores")
 }
 
@@ -43,8 +43,21 @@ zona_promocion = {
     "Zona F": ["Paraguay", "Islandia", "Guinea", "Haití"]
 }
 
+zona_campeonato = {
+    "Zona A": ["Polonia", "Escocia", "Eslovenia", "Estados Unidos", "Congo"],
+    "Zona B": ["Argelia", "Corea", "Irlanda", "Serbia", "Dinamarca"],
+    "Zona C": ["Francia", "Países Bajos", "Australia", "Checa", "Grecia"],
+    "Zona D": ["Costa de Marfil", "Inglaterra", "Gales", "Brasil", "Rumania"],
+    "Zona E": ["Argentina", "Marruecos", "Georgia", "Ghana", "Japón"],
+    "Zona F": ["Colombia", "Finlandia", "Nigeria", "Suiza", "Turquía"],
+    "Zona G": ["Portugal", "Albania", "Hungría", "Italia", "Uruguay"],
+    "Zona H": ["Noruega", "Canadá", "Ucrania", "Suecia", "Mali"]
+}
+
 fechas = [f"Fecha {i+1}" for i in range(7)]
 fechas_promocion = [f"Fecha {i+1}" for i in range(4)]
+fechas_campeonato = [f"Fecha {i+1}" for i in range(5)]
+
 
 cpu = "CPU"
 
@@ -136,9 +149,13 @@ with tab1:
     if fase_sel == "Zona Promoción":
         grupos_activos = zona_promocion
         fechas_activas = fechas_promocion
+    elif fase_sel == "Zona Campeonato":
+        grupos_activos = zona_campeonato
+        fechas_activas = fechas_campeonato
     else:
         grupos_activos = grupos
         fechas_activas = fechas
+
 
     grupo_sel = st.selectbox("Elegí un grupo", list(grupos_activos.keys()), key="grupo_fixture")
     fecha_sel = st.selectbox("Elegí una fecha", fechas_activas, key="fecha_fixture")
@@ -242,8 +259,11 @@ with tab2:
         # barra lateral de color (ajustada por fase)
         if fase_sel == "Zona Promoción":
             color = df["Pos"].apply(lambda p: "#2ecc71" if p <= 2 else "#e74c3c")
+        elif fase_sel == "Segunda fase - Campeonato":
+            color = df["Pos"].apply(lambda p: "#2ecc71" if p <= 3 else "#e74c3c")
         else:
             color = df["Pos"].apply(lambda p: "#2ecc71" if p <= 5 else "#e74c3c")
+
 
         df.insert(0, " ", color.apply(lambda c: f"<div style='width:4px;height:20px;background-color:{c}'></div>"))
 
