@@ -145,7 +145,7 @@ with tab1:
 
     st.markdown("---")
 
-    for equipo in grupos[grupo_sel]:
+    for equipo in grupos_activos[grupo_sel]:
         titulo = f"{bandera_html(equipo)} vs {bandera_html(cpu)}"
         match = df_res[(df_res["Grupo"]==grupo_sel) & (df_res["Fecha"]==fecha_sel) & (df_res["Equipo"]==equipo)]
         ya_cargado = not match.empty
