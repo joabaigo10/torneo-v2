@@ -215,7 +215,13 @@ with tab1:
 # --- TAB 2: TABLAS ---
 with tab2:
     st.subheader(f"📊 Tablas - {fase_sel}")
-    grupo_tabla = st.selectbox("Elegí un grupo", list(grupos.keys()), key="grupo_tabla")
+    if fase_sel == "Zona Promoción":
+        grupos_activos = zona_promocion
+    else:
+        grupos_activos = grupos
+
+    grupo_tabla = st.selectbox("Elegí un grupo", list(grupos_activos.keys()), key="grupo_tabla")
+
     if not df_res.empty:
         stats = {eq: {"PJ":0,"PG":0,"PE":0,"PP":0,"GF":0,"GC":0,"Pts":0} for eq in grupos[grupo_tabla]}
         for _,r in df_res[df_res["Grupo"]==grupo_tabla].iterrows():
