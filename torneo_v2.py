@@ -16,7 +16,7 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(
 )
 client = gspread.authorize(creds)
 
-# --- EQUIPOS (48) ---
+# --- EQUIPOS ---
 equipos = [
 "Polonia","Irlanda","Checa","Rumania","Georgia","Turquía","Albania","Corea",
 "Mali","Portugal","Escocia","Brasil","Japón","Marruecos","Noruega","Dinamarca",
@@ -121,7 +121,7 @@ with tab1:
                 st.success("Guardado")
 
 # =========================
-# 📊 TABLA (FIX DEFINITIVO)
+# 📊 TABLA (FIX)
 # =========================
 with tab2:
     st.subheader("📊 Tabla de posiciones")
@@ -185,12 +185,18 @@ with tab2:
             """)
 
         tabla_html = f"""
-        <table style='width:100%;border-collapse:collapse'>
+        <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;color:black;">
+        <thead>
         <tr>
         <th>#</th><th>Equipo</th><th>Pts</th><th>PJ</th><th>GF</th><th>GC</th><th>DG</th>
         </tr>
+        </thead>
+        <tbody>
         {''.join(filas)}
+        </tbody>
         </table>
+        </div>
         """
 
         st.markdown(tabla_html, unsafe_allow_html=True)
