@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import streamlit.components.v1 as components
 
 # --- CONFIG ---
 SHEET_NAME = "Torneo CPU"
@@ -74,145 +75,109 @@ def load_sheet():
 st.set_page_config(layout="centered")
 st.title("🏆 Liga vs CPU")
 
-if st.button("🔄 Actualizar"):
-    st.rerun()
-
 df_res, df_gol, ws_r, ws_g = load_sheet()
 
 tab1, tab2, tab3 = st.tabs(["📅 Partidos", "📊 Tabla", "⚽ Goleadores"])
 
 # =========================
-# 📅 PARTIDOS
-# =========================
-with tab1:
-    fecha_sel = st.selectbox("Fecha", fechas)
-
-    cargados = len(df_res[df_res["Fecha"] == fecha_sel]) if not df_res.empty else 0
-    total = len(equipos)
-    progreso = int((cargados/total)*100)
-
-    st.markdown(f"### 📅 {fecha_sel}")
-    st.progress(progreso)
-    st.caption(f"{cargados}/{total} partidos cargados")
-
-    for eq in equipos:
-        match = df_res[(df_res["Equipo"] == eq) & (df_res["Fecha"] == fecha_sel)] if not df_res.empty else pd.DataFrame()
-        ya = not match.empty
-
-        g1 = int(match.iloc[0]["GolesEquipo"]) if ya else 0
-        g2 = int(match.iloc[0]["GolesCPU"]) if ya else 0
-
-        color = "#e8f5e9" if ya else "#ffebee"
-
-        st.markdown(f"""
-        <div style='background:{color};border-radius:12px;padding:10px;margin-bottom:8px;color:black;'>
-        <b>{bandera_html(eq)} vs 🤖 CPU</b>
-        <div style='font-size:18px;'><b>{g1} - {g2}</b></div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        c1, c2, c3 = st.columns([1,1,1])
-        g_eq = c1.number_input("⚽",0,20,g1,key=f"{eq}_{fecha_sel}_1")
-        g_cpu = c2.number_input("🤖",0,20,g2,key=f"{eq}_{fecha_sel}_2")
-
-        if c3.button("Guardar", key=f"{eq}_{fecha_sel}"):
-            if not ya:
-                ws_r.append_row([eq, fecha_sel, g_eq, g_cpu])
-                st.success("Guardado")
-
-# =========================
-# 📊 TABLA (FIX)
+# 📊 TABLA (FIX REAL)
 # =========================
 with tab2:
-    st.subheader("📊 Tabla de posiciones")
-
-    columnas_ok = ["Equipo","Fecha","GolesEquipo","GolesCPU"]
-
-    if df_res.empty or not all(col in df_res.columns for col in columnas_ok):
-        st.info("Todavía no hay resultados cargados.")
+    if df_res.empty:
+        st.info("Sin datos")
     else:
         stats = {e:{"PJ":0,"Pts":0,"GF":0,"GC":0} for e in equipos}
 
         for _, r in df_res.iterrows():
             eq = str(r["Equipo"]).strip()
-
             if eq not in stats:
                 continue
 
             gf = int(r["GolesEquipo"])
             gc = int(r["GolesCPU"])
 
-            s = stats[eq]
-            s["PJ"] += 1
-            s["GF"] += gf
-            s["GC"] += gc
+            stats[eq]["PJ"] += 1
+            stats[eq]["GF"] += gf
+            stats[eq]["GC"] += gc
 
             if gf > gc:
-                s["Pts"] += 3
+                stats[eq]["Pts"] += 3
             elif gf == gc:
-                s["Pts"] += 1
+                stats[eq]["Pts"] += 1
 
         df = pd.DataFrame.from_dict(stats, orient="index")
         df["DG"] = df["GF"] - df["GC"]
-
         df = df.sort_values(["Pts","DG","GF"], ascending=False)
         df = df.reset_index().rename(columns={"index":"Equipo"})
         df.insert(0,"Pos", range(1,len(df)+1))
 
-        df["Equipo"] = df["Equipo"].apply(bandera_html)
-
-        filas = []
-        for _, row in df.iterrows():
-            pos = row["Pos"]
+        filas = ""
+        for _, r in df.iterrows():
+            pos = r["Pos"]
 
             if pos == 1:
-                fondo = "#d4edda"
+                bg = "#d4edda"
             elif pos >= len(df)-2:
-                fondo = "#f8d7da"
+                bg = "#f8d7da"
             else:
-                fondo = "white"
+                bg = "white"
 
-            filas.append(f"""
-            <tr style='background:{fondo}'>
+            filas += f"""
+            <tr style='background:{bg}'>
                 <td>{pos}</td>
-                <td>{row['Equipo']}</td>
-                <td>{row['Pts']}</td>
-                <td>{row['PJ']}</td>
-                <td>{row['GF']}</td>
-                <td>{row['GC']}</td>
-                <td>{row['DG']}</td>
+                <td>{bandera_html(r['Equipo'])}</td>
+                <td>{r['Pts']}</td>
+                <td>{r['PJ']}</td>
+                <td>{r['GF']}</td>
+                <td>{r['GC']}</td>
+                <td>{r['DG']}</td>
             </tr>
-            """)
+            """
 
-        tabla_html = f"""
-        <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;color:black;">
-        <thead>
+        html = f"""
+        <html>
+        <body style="color:black;">
+        <table style="width:100%;border-collapse:collapse;">
         <tr>
         <th>#</th><th>Equipo</th><th>Pts</th><th>PJ</th><th>GF</th><th>GC</th><th>DG</th>
         </tr>
-        </thead>
-        <tbody>
-        {''.join(filas)}
-        </tbody>
+        {filas}
         </table>
-        </div>
+        </body>
+        </html>
         """
 
-        st.markdown(tabla_html, unsafe_allow_html=True)
+        components.html(html, height=800)
 
 # =========================
-# ⚽ GOLEADORES
+# ⚽ GOLEADORES (CON BANDERAS)
 # =========================
 with tab3:
-    if not df_gol.empty:
-        df_rank = df_gol.groupby(["Jugador","Equipo"])["Goles"].sum().reset_index()
-        df_rank = df_rank.sort_values("Goles",ascending=False)
-
-        st.markdown("## 🔥 Top 10")
-        st.dataframe(df_rank.head(10), use_container_width=True)
-
-        st.markdown("## 📋 Todos")
-        st.dataframe(df_rank, use_container_width=True)
+    if df_gol.empty:
+        st.info("Sin goleadores")
     else:
-        st.info("Sin goleadores aún")
+        df_rank = df_gol.groupby(["Jugador","Equipo"])["Goles"].sum().reset_index()
+        df_rank = df_rank.sort_values("Goles", ascending=False)
+
+        filas = ""
+        for _, r in df_rank.iterrows():
+            filas += f"""
+            <tr>
+                <td>{r['Jugador']}</td>
+                <td>{bandera_html(r['Equipo'])}</td>
+                <td>⚽ {r['Goles']}</td>
+            </tr>
+            """
+
+        html = f"""
+        <html>
+        <body style="color:black;">
+        <table style="width:100%;">
+        <tr><th>Jugador</th><th>Equipo</th><th>Goles</th></tr>
+        {filas}
+        </table>
+        </body>
+        </html>
+        """
+
+        components.html(html, height=600)
