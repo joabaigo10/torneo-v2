@@ -3,362 +3,189 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# --- CONFIGURACIÓN GOOGLE SHEETS ---
+# --- CONFIG ---
 SHEET_NAME = "Torneo CPU"
 
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds_dict = st.secrets["google_service_account"]
-creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(creds_dict), scope)
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
+
+creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    dict(st.secrets["google_service_account"]), scope
+)
 client = gspread.authorize(creds)
 
-# --- CACHÉ EN SESIÓN ---
-if "sheet_cache" not in st.session_state:
-    st.session_state.sheet_cache = {}
+# --- EQUIPOS ---
+equipos = [
+    "Argentina","Brasil","España","Francia","Italia","Alemania",
+    "Portugal","Inglaterra","Holanda","Bélgica",
+    "Uruguay","Colombia","México","Chile","Perú",
+    "Estados Unidos","Canadá","Japón","Corea","Australia",
+    "Marruecos","Nigeria","Senegal","Camerún","Ghana",
+    "Croacia","Suiza","Dinamarca","Suecia","Noruega"
+]
 
-# --- HOJAS DISPONIBLES ---
-SHEETS = {
-    "Fase de grupos": ("resultados", "goleadores"),
-    "Zona Campeonato": ("segunda_campeonato", "goleadores_campeonato"),
-    "Zona Promoción": ("promocion_resultados", "promocion_goleadores")
-}
-
-# --- DATOS TORNEO ---
-grupos = {
-    "Grupo A": ["España", "México", "Australia", "Noruega", "Polonia", "Venezuela", "Ghana", "Albania"],
-    "Grupo B": ["Francia", "Marruecos", "Austria", "Canadá", "Paraguay", "Nigeria", "Eslovenia", "Bosnia"],
-    "Grupo C": ["Argentina", "Alemania", "Corea", "Suecia", "Escocia", "Costa de Marfil", "Islandia", "Angola"],
-    "Grupo D": ["Inglaterra", "Uruguay", "Dinamarca", "Surinam", "Checa", "Cabo Verde", "Jamaica", "Finlandia"],
-    "Grupo E": ["Portugal", "Colombia", "Senegal", "Serbia", "Grecia", "Rumania", "Chile", "Burkina Faso"],
-    "Grupo F": ["Brasil", "Croacia", "Japón", "Ucrania", "Hungría", "Camerún", "Irlanda", "Guinea"],
-    "Grupo G": ["Países Bajos", "Italia", "Ecuador", "Turquía", "Eslovaquia", "Mali", "Congo", "Haití"],
-    "Grupo H": ["Bélgica", "Estados Unidos", "Suiza", "Gales", "Argelia", "Arabia", "Georgia", "Kosovo"]
-}
-
-zona_promocion = {
-    "Zona A": ["España", "Surinam", "Senegal", "Eslovaquia"],
-    "Zona B": ["México", "Cabo Verde", "Chile", "Bélgica"],
-    "Zona C": ["Venezuela", "Angola", "Croacia", "Kosovo"],
-    "Zona D": ["Austria", "Alemania", "Burkina Faso", "Ecuador"],
-    "Zona E": ["Bosnia", "Jamaica", "Camerún", "Arabia"],
-    "Zona F": ["Paraguay", "Islandia", "Guinea", "Haití"]
-}
-
-zona_campeonato = {
-    "Zona A": ["Polonia", "Escocia", "Eslovenia", "Estados Unidos", "Congo"],
-    "Zona B": ["Argelia", "Corea", "Irlanda", "Serbia", "Dinamarca"],
-    "Zona C": ["Francia", "Países Bajos", "Australia", "Checa", "Grecia"],
-    "Zona D": ["Costa de Marfil", "Inglaterra", "Gales", "Brasil", "Rumania"],
-    "Zona E": ["Argentina", "Marruecos", "Georgia", "Ghana", "Japón"],
-    "Zona F": ["Colombia", "Finlandia", "Nigeria", "Suiza", "Turquía"],
-    "Zona G": ["Portugal", "Albania", "Hungría", "Italia", "Uruguay"],
-    "Zona H": ["Noruega", "Canadá", "Ucrania", "Suecia", "Mali"]
-}
-
-fechas = [f"Fecha {i+1}" for i in range(7)]
-fechas_promocion = [f"Fecha {i+1}" for i in range(4)]
-fechas_campeonato = [f"Fecha {i+1}" for i in range(5)]
-
-
+fechas = [f"Fecha {i+1}" for i in range(20)]
 cpu = "CPU"
-
-
 
 # --- BANDERAS ---
 def bandera_html(nombre):
-    especiales = {
-        "Escocia": "https://flagcdn.com/w20/gb-sct.png",
-        "Gales": "https://flagcdn.com/w20/gb-wls.png",
-        "Inglaterra": "https://flagcdn.com/w20/gb-eng.png",
-        "Kosovo": "https://flagcdn.com/w20/xk.png"
-    }
-    if nombre in especiales:
-        return f"<img src='{especiales[nombre]}' width='20'> {nombre}"
     codigos = {
-        "España":"es","México":"mx","Australia":"au","Noruega":"no","Polonia":"pl","Venezuela":"ve","Ghana":"gh","Albania":"al",
-        "Francia":"fr","Marruecos":"ma","Austria":"at","Canadá":"ca","Paraguay":"py","Nigeria":"ng","Eslovenia":"si","Bosnia":"ba",
-        "Argentina":"ar","Alemania":"de","Corea":"kr","Suecia":"se","Costa de Marfil":"ci","Islandia":"is","Angola":"ao",
-        "Uruguay":"uy","Dinamarca":"dk","Surinam":"sr","Checa":"cz","Cabo Verde":"cv","Jamaica":"jm","Finlandia":"fi",
-        "Portugal":"pt","Colombia":"co","Senegal":"sn","Serbia":"rs","Grecia":"gr","Rumania":"ro","Chile":"cl","Burkina Faso":"bf",
-        "Brasil":"br","Croacia":"hr","Japón":"jp","Ucrania":"ua","Hungría":"hu","Camerún":"cm","Irlanda":"ie","Guinea":"gn",
-        "Países Bajos":"nl","Italia":"it","Ecuador":"ec","Turquía":"tr","Eslovaquia":"sk","Mali":"ml","Congo":"cd","Haití":"ht",
-        "Bélgica":"be","Estados Unidos":"us","Suiza":"ch","Argelia":"dz","Arabia":"sa","Georgia":"ge",
+        "Argentina":"ar","Brasil":"br","España":"es","Francia":"fr","Italia":"it","Alemania":"de",
+        "Portugal":"pt","Inglaterra":"gb-eng","Holanda":"nl","Bélgica":"be",
+        "Uruguay":"uy","Colombia":"co","México":"mx","Chile":"cl","Perú":"pe",
+        "Estados Unidos":"us","Canadá":"ca","Japón":"jp","Corea":"kr","Australia":"au",
+        "Marruecos":"ma","Nigeria":"ng","Senegal":"sn","Camerún":"cm","Ghana":"gh",
+        "Croacia":"hr","Suiza":"ch","Dinamarca":"dk","Suecia":"se","Noruega":"no"
     }
     code = codigos.get(nombre)
     if code:
-        return f"<img src='https://flagcdn.com/w20/{code}.png' width='20'> {nombre}"
-    elif nombre == "CPU":
-        return f"🤖 {nombre}"
+        return f"<img src='https://flagcdn.com/w20/{code}.png'> {nombre}"
     return nombre
 
-# --- FUNCIONES ---
-def load_sheet(res_name, gol_name):
-    """Carga datos de Google Sheets con validación automática de columnas"""
-    cache_key = f"{res_name}_{gol_name}"
-    if cache_key in st.session_state.sheet_cache:
-        return st.session_state.sheet_cache[cache_key]
-
+# --- LOAD SHEET ---
+def load_sheet():
     sh = client.open(SHEET_NAME)
 
-    # --- RESULTADOS ---
     try:
-        ws_r = sh.worksheet(res_name)
+        ws_r = sh.worksheet("liga_resultados")
     except:
-        ws_r = sh.add_worksheet(title=res_name, rows="1000", cols="10")
+        ws_r = sh.add_worksheet("liga_resultados", 1000, 10)
+        ws_r.append_row(["Equipo","Fecha","GolesEquipo","GolesCPU"])
 
-    # Verificar encabezados correctos
-    expected_cols_r = ["Grupo", "Fecha", "Equipo", "GolesEquipo", "GolesCPU"]
-    first_row_r = ws_r.row_values(1)
-    if first_row_r != expected_cols_r:
-        ws_r.clear()
-        ws_r.append_row(expected_cols_r)
-
-    # --- GOLEADORES ---
     try:
-        ws_g = sh.worksheet(gol_name)
+        ws_g = sh.worksheet("liga_goleadores")
     except:
-        ws_g = sh.add_worksheet(title=gol_name, rows="1000", cols="10")
+        ws_g = sh.add_worksheet("liga_goleadores", 1000, 10)
+        ws_g.append_row(["Equipo","Jugador","Goles","Fecha"])
 
-    expected_cols_g = ["Equipo", "Jugador", "Goles", "Grupo", "Fecha"]
-    first_row_g = ws_g.row_values(1)
-    if first_row_g != expected_cols_g:
-        ws_g.clear()
-        ws_g.append_row(expected_cols_g)
+    records_r = ws_r.get_all_records()
+    records_g = ws_g.get_all_records()
 
-    # --- Cargar DataFrames ---
-    df_r = pd.DataFrame(ws_r.get_all_records())
-    df_g = pd.DataFrame(ws_g.get_all_records())
+    df_r = pd.DataFrame(records_r) if records_r else pd.DataFrame(columns=["Equipo","Fecha","GolesEquipo","GolesCPU"])
+    df_g = pd.DataFrame(records_g) if records_g else pd.DataFrame(columns=["Equipo","Jugador","Goles","Fecha"])
 
-    st.session_state.sheet_cache[cache_key] = (df_r, df_g, ws_r, ws_g)
     return df_r, df_g, ws_r, ws_g
 
-
-
-def guardar_resultado(ws_results, grupo, fecha, equipo, goles_eq, goles_cpu):
-    ws_results.append_row([grupo, fecha, equipo, goles_eq, goles_cpu])
-
-
-def guardar_goleadores(ws_scorers, grupo, fecha, equipo, jugadores):
-    for j in jugadores:
-        ws_scorers.append_row([equipo, j, 1, grupo, fecha])
-
-
 # --- APP ---
-st.set_page_config(page_title="Torneo vs CPU", layout="centered")
-st.title("🏆 Torneo vs CPU")
+st.set_page_config(layout="centered")
+st.title("🏆 Liga vs CPU")
 
-fase_sel = st.selectbox("Elegí la fase", list(SHEETS.keys()))
-res_name, gol_name = SHEETS[fase_sel]
-
-# Botón para refrescar manualmente
-if st.button("🔄 Actualizar datos"):
-    st.session_state.sheet_cache = {}
+if st.button("🔄 Actualizar"):
     st.rerun()
 
-df_res, df_gol, ws_results, ws_scorers = load_sheet(res_name, gol_name)
+df_res, df_gol, ws_r, ws_g = load_sheet()
 
-tab1, tab2, tab3 = st.tabs(["📅 Fixture / Resultados", "📊 Tablas", "⚽ Goleadores"])
+tab1, tab2, tab3 = st.tabs(["📅 Partidos", "📊 Tabla", "⚽ Goleadores"])
 
-# --- TAB 1: FIXTURE / RESULTADOS ---
+# --- TAB 1 ---
 with tab1:
-    # Detectar si es Zona Promoción
-    if fase_sel == "Zona Promoción":
-        grupos_activos = zona_promocion
-        fechas_activas = fechas_promocion
-    elif fase_sel == "Zona Campeonato":
-        grupos_activos = zona_campeonato
-        fechas_activas = fechas_campeonato
-    else:
-        grupos_activos = grupos
-        fechas_activas = fechas
+    fecha_sel = st.selectbox("Fecha", fechas)
 
+    faltan = len(equipos) - len(df_res[df_res["Fecha"] == fecha_sel])
+    st.markdown(f"### 📊 {fecha_sel} — {faltan} sin cargar")
 
-    grupo_sel = st.selectbox("Elegí un grupo", list(grupos_activos.keys()), key="grupo_fixture")
-    fecha_sel = st.selectbox("Elegí una fecha", fechas_activas, key="fecha_fixture")
+    total = len(equipos)
+    cargados = len(df_res[df_res["Fecha"] == fecha_sel])
+    st.progress(int((cargados/total)*100))
 
-    st.markdown("---")
+    for eq in equipos:
+        match = df_res[(df_res["Equipo"] == eq) & (df_res["Fecha"] == fecha_sel)]
+        ya = not match.empty
 
-    for equipo in grupos_activos[grupo_sel]:
-        titulo = f"{bandera_html(equipo)} vs {bandera_html(cpu)}"
+        g1 = int(match.iloc[0]["GolesEquipo"]) if ya else 0
+        g2 = int(match.iloc[0]["GolesCPU"]) if ya else 0
 
-    # Buscar si ya tiene resultado cargado
-        match = df_res[
-            (df_res["Grupo"].astype(str).str.strip().str.lower() == grupo_sel.lower())
-            & (df_res["Fecha"].astype(str).str.strip().str.lower() == fecha_sel.lower())
-            & (df_res["Equipo"].astype(str).str.strip().str.lower() == equipo.lower())
-        ]
+        color = "#d4edda" if ya else "#ffe6e6"
+        borde = "#28a745" if ya else "#dc3545"
 
+        st.markdown(f"""
+        <div style='background:{color};border-left:6px solid {borde};padding:8px;border-radius:8px;margin-bottom:5px'>
+        <b>{bandera_html(eq)} vs 🤖 CPU</b>
+        </div>
+        """, unsafe_allow_html=True)
 
-        if match.empty:
-            goles_eq, goles_cpu, ya_cargado = 0, 0, False
-        else:
-            goles_eq = int(match.iloc[0].get("GolesEquipo", 0))
-            goles_cpu = int(match.iloc[0].get("GolesCPU", 0))
-            ya_cargado = True
+        c1, c2, c3 = st.columns([1,1,1])
+        g_eq = c1.number_input("",0,20,g1,key=f"{eq}_{fecha_sel}_1")
+        g_cpu = c2.number_input("",0,20,g2,key=f"{eq}_{fecha_sel}_2")
 
-    # Mostrar la fila (gris si ya cargado)
-        st.markdown(
-            f"<div style='background-color:{'#f0f0f0' if ya_cargado else 'transparent'};"
-            f"padding:5px;border-radius:6px'><b>{titulo}</b></div>",
-            unsafe_allow_html=True
-        )
+        if c3.button("💾", key=f"{eq}_{fecha_sel}_save"):
+            if not ya:
+                ws_r.append_row([eq, fecha_sel, g_eq, g_cpu])
+                st.success("Guardado")
 
-        col1, col2, col3 = st.columns([2, 1, 1])
-        g_eq = col1.number_input(
-            "Goles equipo", 0, 50, goles_eq,
-            key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_eq"
-        )
-        g_cpu = col2.number_input(
-            "Goles CPU", 0, 50, goles_cpu,
-            key=f"{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}_cpu"
-        )
+        # --- GOLEADORES ---
+        with st.expander("⚽ Goleadores"):
 
-        if col3.button("💾", key=f"save_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}"):
-            if not ya_cargado:
-                guardar_resultado(ws_results, grupo_sel, fecha_sel, equipo, g_eq, g_cpu)
-                st.success(f"✅ Guardado: {equipo} {g_eq}-{g_cpu} CPU")
-            else:
-                st.warning("⚠️ Ya cargaste este partido.")
+            jugadores_existentes = df_gol[df_gol["Equipo"]==eq]["Jugador"].dropna().unique().tolist()
 
-        with st.expander("Goleadores"):
-    # Si el df_gol no tiene columnas (hoja vacía), evitar error
-            if not all(c in df_gol.columns for c in ["Equipo", "Jugador", "Goles", "Grupo", "Fecha"]):
-                 jugadores_guardados = ""
-            else:
-                gol_match = df_gol[
-                    (df_gol["Equipo"] == equipo)
-                    & (df_gol["Grupo"] == grupo_sel)
-                    & (df_gol["Fecha"] == fecha_sel)
-                ]
-                jugadores_guardados = ", ".join(gol_match["Jugador"].tolist()) if not gol_match.empty else ""
+            busqueda = st.text_input("Buscar jugador", key=f"bus_{eq}_{fecha_sel}")
 
-            goles_txt = st.text_input(
-                "Jugadores (separar por coma)",
-                jugadores_guardados,
-                key=f"gols_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}",
-            )
+            sugerencias = [j for j in jugadores_existentes if busqueda.lower() in j.lower()] if busqueda else jugadores_existentes
+            sugerencias = sugerencias[:5]
 
-            if st.button("⚽ Guardar goleadores", key=f"save_gol_{fase_sel}_{grupo_sel}_{fecha_sel}_{equipo}"):
-                jugadores = [j.strip() for j in goles_txt.split(",") if j.strip()]
-                if jugadores:
-                    guardar_goleadores(ws_scorers, grupo_sel, fecha_sel, equipo, jugadores)
-                    st.success("✅ Goleadores guardados")
+            col1, col2, col3 = st.columns([2,1,1])
 
+            jugador_sel = col1.selectbox("Sugerencias", [""]+sugerencias, key=f"sug_{eq}_{fecha_sel}")
+            jugador_final = jugador_sel if jugador_sel else busqueda
 
+            goles = col2.number_input("Goles",1,10,1,key=f"gol_{eq}_{fecha_sel}")
 
-# --- TAB 2: TABLAS ---
-# --- TAB 2: TABLAS ---
+            if col3.button("⚽", key=f"golbtn_{eq}_{fecha_sel}"):
+                if jugador_final:
+                    jugador_final = jugador_final.strip().title()
+                    for _ in range(goles):
+                        ws_g.append_row([eq, jugador_final, 1, fecha_sel])
+                    st.success(f"{jugador_final} x{goles}")
+
+# --- TAB 2 ---
 with tab2:
-    st.subheader(f"📊 Tablas - {fase_sel}")
+    stats = {e:{"PJ":0,"Pts":0,"GF":0,"GC":0} for e in equipos}
 
-    # Detectar zona activa según la fase
-    if fase_sel == "Zona Promoción":
-        grupos_activos = zona_promocion
-    elif fase_sel == "Zona Campeonato":
-        grupos_activos = zona_campeonato
-    else:
-        grupos_activos = grupos
+    for _,r in df_res.iterrows():
+        eq = r["Equipo"]
+        gf = int(r["GolesEquipo"])
+        gc = int(r["GolesCPU"])
 
-    grupo_tabla = st.selectbox("Elegí un grupo", list(grupos_activos.keys()), key="grupo_tabla")
+        s = stats[eq]
+        s["PJ"]+=1
+        s["GF"]+=gf
+        s["GC"]+=gc
 
-    if not df_res.empty:
-        # Crear estructura de estadísticas vacía
-        stats = {eq: {"PJ": 0, "PG": 0, "PE": 0, "PP": 0, "GF": 0, "GC": 0, "Pts": 0}
-                 for eq in grupos_activos[grupo_tabla]}
+        if gf>gc: s["Pts"]+=3
+        elif gf==gc: s["Pts"]+=1
 
-        # Filtrar por grupo actual (asegurando coincidencia de texto)
-        for _, r in df_res[df_res["Grupo"].astype(str).str.strip().str.lower() == grupo_tabla.lower()].iterrows():
-            eq, gf, gc = r["Equipo"], int(r["GolesEquipo"]), int(r["GolesCPU"])
-            s = stats.get(eq)
-            if s is not None:
-                s["PJ"] += 1
-                s["GF"] += gf
-                s["GC"] += gc
-                if gf > gc:
-                    s["PG"] += 1
-                    s["Pts"] += 3
-                elif gf == gc:
-                    s["PE"] += 1
-                    s["Pts"] += 1
-                else:
-                    s["PP"] += 1
+    df = pd.DataFrame.from_dict(stats,orient="index")
+    df["DG"]=df["GF"]-df["GC"]
 
-        # Crear DataFrame de tabla
-        df = pd.DataFrame.from_dict(stats, orient="index")
-        df["DG"] = df["GF"] - df["GC"]
-        df = df.sort_values(by=["Pts", "DG", "GF"], ascending=[False, False, False]).reset_index().rename(columns={"index": "Equipo"})
-        df.insert(0, "Pos", range(1, len(df) + 1))
-        df["Equipo"] = df["Equipo"].apply(bandera_html)
+    df = df.sort_values(["Pts","DG","GF"],ascending=False)
+    df = df.reset_index().rename(columns={"index":"Equipo"})
+    df.insert(0,"Pos",range(1,len(df)+1))
 
-        # Definir color según fase
-        if fase_sel == "Zona Promoción":
-            color = df["Pos"].apply(lambda p: "#2ecc71" if p <= 2 else "#e74c3c")
-        elif fase_sel == "Zona Campeonato":
-            color = df["Pos"].apply(lambda p: "#2ecc71" if p <= 3 else ("#e74c3c" if p in [4, 5] else "transparent"))
-        else:
-            color = df["Pos"].apply(lambda p: "#2ecc71" if p <= 5 else "#e74c3c")
+    # Colores
+    def color_bar(pos):
+        if pos == 1:
+            return "#2ecc71"
+        elif pos >= len(df)-2:
+            return "#e74c3c"
+        return "transparent"
 
-        # Agregar barra de color lateral
-        df.insert(0, " ", color.apply(lambda c: f"<div style='width:4px;height:20px;background-color:{c}'></div>"))
+    df.insert(0," ", df["Pos"].apply(lambda p: f"<div style='width:4px;height:20px;background:{color_bar(p)}'></div>"))
 
-        tabla_html = df[[" ", "Pos", "Equipo", "Pts", "PJ", "PG", "PE", "PP", "GF", "GC", "DG"]].to_html(escape=False, index=False)
-        st.markdown(tabla_html, unsafe_allow_html=True)
+    st.markdown(df.to_html(escape=False,index=False), unsafe_allow_html=True)
 
-    else:
-        st.info("Todavía no hay resultados cargados en esta fase.")
-
-
-# --- TAB 3: GOLEADORES ---
+# --- TAB 3 ---
 with tab3:
-    st.subheader(f"⚽ Goleadores - {fase_sel}")
+    if not df_gol.empty:
+        df_rank = df_gol.groupby(["Jugador","Equipo"])["Goles"].sum().reset_index()
+        df_rank = df_rank.sort_values("Goles",ascending=False)
 
-    vista_sel = st.radio(
-        "Ver:",
-        ["Esta fase", "General"],
-        horizontal=True,
-        key="vista_goleadores"
-    )
+        st.markdown("## 🔥 Top 10")
+        top10 = df_rank.head(10)
+        st.dataframe(top10, use_container_width=True)
 
-    if vista_sel == "General":
-        # Unir los goleadores de todas las fases
-        hojas = [
-            ("resultados", "goleadores"),
-            ("segunda_campeonato", "goleadores_campeonato"),
-            ("segunda_promocion", "goleadores_promocion")
-        ]
-        frames = []
-        for r, g in hojas:
-            try:
-                _, df_g, _, _ = load_sheet(r, g)  # acá está el cambio importante
-                if not df_g.empty:
-                    frames.append(df_g)
-            except Exception as e:
-                print("Error al leer hoja", g, e)
-                continue
-
-        if frames:
-            df_all = pd.concat(frames, ignore_index=True)
-            df_rank = (
-                df_all.groupby(["Jugador", "Equipo"])["Goles"]
-                .sum()
-                .reset_index()
-                .sort_values("Goles", ascending=False)
-            )
-            df_rank["Equipo"] = df_rank["Equipo"].apply(bandera_html)
-            goleadores_html = df_rank.to_html(escape=False, index=False)
-            st.markdown(goleadores_html, unsafe_allow_html=True)
-        else:
-            st.info("Todavía no hay goleadores cargados en ninguna fase.")
+        st.markdown("## 📋 Todos")
+        st.dataframe(df_rank, use_container_width=True)
     else:
-        # Solo los goleadores de la fase actual
-        if not df_gol.empty:
-            df_rank = (
-                df_gol.groupby(["Jugador", "Equipo"])["Goles"]
-                .sum()
-                .reset_index()
-                .sort_values("Goles", ascending=False)
-            )
-            df_rank["Equipo"] = df_rank["Equipo"].apply(bandera_html)
-            goleadores_html = df_rank.to_html(escape=False, index=False)
-            st.markdown(goleadores_html, unsafe_allow_html=True)
-        else:
-            st.info("Todavía no hay goleadores cargados en esta fase.")
+        st.info("Sin goleadores aún")
