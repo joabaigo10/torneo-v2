@@ -207,7 +207,7 @@ with tab2:
         </html>
         """
 
-        components.html(html, height=800)
+        components.html(html, height=2000)
 
 # =========================
 # ⚽ GOLEADORES
