@@ -82,12 +82,12 @@ df_res, df_gol, ws_r, ws_g = load_sheet()
 tab1, tab2, tab3 = st.tabs(["📅 Partidos", "📊 Tabla", "⚽ Goleadores"])
 
 # =========================
-# 📅 PARTIDOS (ONEFOOTBALL)
+# 📅 PARTIDOS
 # =========================
 with tab1:
-    fecha_sel = st.selectbox("Seleccionar fecha", fechas)
+    fecha_sel = st.selectbox("Fecha", fechas)
 
-    cargados = len(df_res[df_res["Fecha"] == fecha_sel])
+    cargados = len(df_res[df_res["Fecha"] == fecha_sel]) if not df_res.empty else 0
     total = len(equipos)
     progreso = int((cargados/total)*100)
 
@@ -96,7 +96,7 @@ with tab1:
     st.caption(f"{cargados}/{total} partidos cargados")
 
     for eq in equipos:
-        match = df_res[(df_res["Equipo"] == eq) & (df_res["Fecha"] == fecha_sel)]
+        match = df_res[(df_res["Equipo"] == eq) & (df_res["Fecha"] == fecha_sel)] if not df_res.empty else pd.DataFrame()
         ya = not match.empty
 
         g1 = int(match.iloc[0]["GolesEquipo"]) if ya else 0
@@ -104,21 +104,10 @@ with tab1:
 
         color = "#e8f5e9" if ya else "#ffebee"
 
-        # TARJETA
         st.markdown(f"""
-        <div style='
-        background:{color};
-        border-radius:12px;
-        padding:10px;
-        margin-bottom:8px;
-        box-shadow:0 2px 5px rgba(0,0,0,0.1);
-        color:black;
-        '>
-        <div style='display:flex;justify-content:space-between;align-items:center;'>
-            <div>{bandera_html(eq)}</div>
-            <div style='font-size:18px;'><b>{g1} - {g2}</b></div>
-            <div>🤖 CPU</div>
-        </div>
+        <div style='background:{color};border-radius:12px;padding:10px;margin-bottom:8px;color:black;'>
+        <b>{bandera_html(eq)} vs 🤖 CPU</b>
+        <div style='font-size:18px;'><b>{g1} - {g2}</b></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -131,87 +120,80 @@ with tab1:
                 ws_r.append_row([eq, fecha_sel, g_eq, g_cpu])
                 st.success("Guardado")
 
-        # GOLEADORES
-        jugadores = df_gol[df_gol["Equipo"]==eq]["Jugador"].dropna().unique().tolist()
-
-        busqueda = st.text_input("Jugador", key=f"bus_{eq}_{fecha_sel}")
-        sugerencias = [j for j in jugadores if busqueda.lower() in j.lower()] if busqueda else jugadores
-        sugerencias = sugerencias[:5]
-
-        col1, col2, col3 = st.columns([2,1,1])
-
-        sel = col1.selectbox("Sugerencias", [""]+sugerencias, key=f"sug_{eq}_{fecha_sel}")
-        jugador = sel if sel else busqueda
-
-        goles = col2.number_input("G",1,10,1,key=f"g_{eq}_{fecha_sel}")
-
-        if col3.button("⚽", key=f"gol_{eq}_{fecha_sel}"):
-            if jugador:
-                jugador = jugador.title()
-                for _ in range(goles):
-                    ws_g.append_row([eq, jugador, 1, fecha_sel])
-                st.success(f"{jugador} x{goles}")
-
 # =========================
-# 📊 TABLA
+# 📊 TABLA (FIX DEFINITIVO)
 # =========================
 with tab2:
-    stats = {e:{"PJ":0,"Pts":0,"GF":0,"GC":0} for e in equipos}
+    st.subheader("📊 Tabla de posiciones")
 
-    for _,r in df_res.iterrows():
-        eq = r["Equipo"]
-        gf = int(r["GolesEquipo"])
-        gc = int(r["GolesCPU"])
+    columnas_ok = ["Equipo","Fecha","GolesEquipo","GolesCPU"]
 
-        s = stats[eq]
-        s["PJ"]+=1
-        s["GF"]+=gf
-        s["GC"]+=gc
+    if df_res.empty or not all(col in df_res.columns for col in columnas_ok):
+        st.info("Todavía no hay resultados cargados.")
+    else:
+        stats = {e:{"PJ":0,"Pts":0,"GF":0,"GC":0} for e in equipos}
 
-        if gf>gc: s["Pts"]+=3
-        elif gf==gc: s["Pts"]+=1
+        for _, r in df_res.iterrows():
+            eq = str(r["Equipo"]).strip()
 
-    df = pd.DataFrame.from_dict(stats,orient="index")
-    df["DG"]=df["GF"]-df["GC"]
+            if eq not in stats:
+                continue
 
-    df = df.sort_values(["Pts","DG","GF"],ascending=False)
-    df = df.reset_index().rename(columns={"index":"Equipo"})
-    df.insert(0,"Pos",range(1,len(df)+1))
+            gf = int(r["GolesEquipo"])
+            gc = int(r["GolesCPU"])
 
-    df["Equipo"] = df["Equipo"].apply(bandera_html)
+            s = stats[eq]
+            s["PJ"] += 1
+            s["GF"] += gf
+            s["GC"] += gc
 
-    filas = []
-    for i,row in df.iterrows():
-        pos = row["Pos"]
+            if gf > gc:
+                s["Pts"] += 3
+            elif gf == gc:
+                s["Pts"] += 1
 
-        if pos == 1:
-            fondo = "#d4edda"
-        elif pos >= len(df)-2:
-            fondo = "#f8d7da"
-        else:
-            fondo = "white"
+        df = pd.DataFrame.from_dict(stats, orient="index")
+        df["DG"] = df["GF"] - df["GC"]
 
-        filas.append(f"""
-        <tr style='background:{fondo}'>
-            <td>{pos}</td>
-            <td>{row['Equipo']}</td>
-            <td>{row['Pts']}</td>
-            <td>{row['PJ']}</td>
-            <td>{row['GF']}</td>
-            <td>{row['GC']}</td>
+        df = df.sort_values(["Pts","DG","GF"], ascending=False)
+        df = df.reset_index().rename(columns={"index":"Equipo"})
+        df.insert(0,"Pos", range(1,len(df)+1))
+
+        df["Equipo"] = df["Equipo"].apply(bandera_html)
+
+        filas = []
+        for _, row in df.iterrows():
+            pos = row["Pos"]
+
+            if pos == 1:
+                fondo = "#d4edda"
+            elif pos >= len(df)-2:
+                fondo = "#f8d7da"
+            else:
+                fondo = "white"
+
+            filas.append(f"""
+            <tr style='background:{fondo}'>
+                <td>{pos}</td>
+                <td>{row['Equipo']}</td>
+                <td>{row['Pts']}</td>
+                <td>{row['PJ']}</td>
+                <td>{row['GF']}</td>
+                <td>{row['GC']}</td>
+                <td>{row['DG']}</td>
+            </tr>
+            """)
+
+        tabla_html = f"""
+        <table style='width:100%;border-collapse:collapse'>
+        <tr>
+        <th>#</th><th>Equipo</th><th>Pts</th><th>PJ</th><th>GF</th><th>GC</th><th>DG</th>
         </tr>
-        """)
+        {''.join(filas)}
+        </table>
+        """
 
-    tabla_html = f"""
-    <table style='width:100%;border-collapse:collapse'>
-    <tr>
-    <th>#</th><th>Equipo</th><th>Pts</th><th>PJ</th><th>GF</th><th>GC</th>
-    </tr>
-    {''.join(filas)}
-    </table>
-    """
-
-    st.markdown(tabla_html, unsafe_allow_html=True)
+        st.markdown(tabla_html, unsafe_allow_html=True)
 
 # =========================
 # ⚽ GOLEADORES
@@ -222,19 +204,7 @@ with tab3:
         df_rank = df_rank.sort_values("Goles",ascending=False)
 
         st.markdown("## 🔥 Top 10")
-
-        for _,r in df_rank.head(10).iterrows():
-            st.markdown(f"""
-            <div style='
-            background:#f8f9fa;
-            padding:8px;
-            border-radius:10px;
-            margin-bottom:5px;
-            color:black;
-            '>
-            <b>{r['Jugador']}</b> ({r['Equipo']}) — ⚽ {r['Goles']}
-            </div>
-            """, unsafe_allow_html=True)
+        st.dataframe(df_rank.head(10), use_container_width=True)
 
         st.markdown("## 📋 Todos")
         st.dataframe(df_rank, use_container_width=True)
