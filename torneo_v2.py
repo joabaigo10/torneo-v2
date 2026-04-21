@@ -80,7 +80,38 @@ df_res, df_gol, ws_r, ws_g = load_sheet()
 tab1, tab2, tab3 = st.tabs(["📅 Partidos", "📊 Tabla", "⚽ Goleadores"])
 
 # =========================
-# 📊 TABLA (FIX REAL)
+# 📅 PARTIDOS (RESTAURADO)
+# =========================
+with tab1:
+    fecha_sel = st.selectbox("Fecha", fechas)
+
+    for eq in equipos:
+        match = df_res[(df_res["Equipo"] == eq) & (df_res["Fecha"] == fecha_sel)] if not df_res.empty else pd.DataFrame()
+        ya = not match.empty
+
+        g1 = int(match.iloc[0]["GolesEquipo"]) if ya else 0
+        g2 = int(match.iloc[0]["GolesCPU"]) if ya else 0
+
+        color = "#1e1e1e" if ya else "#2c2c2c"
+
+        st.markdown(f"""
+        <div style='background:{color};border-radius:10px;padding:10px;margin-bottom:6px;color:white;'>
+        <b>{bandera_html(eq)} vs 🤖 CPU</b><br>
+        <span style='font-size:18px'>{g1} - {g2}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        c1, c2, c3 = st.columns([1,1,1])
+        g_eq = c1.number_input("⚽",0,20,g1,key=f"{eq}_{fecha_sel}_1")
+        g_cpu = c2.number_input("🤖",0,20,g2,key=f"{eq}_{fecha_sel}_2")
+
+        if c3.button("Guardar", key=f"{eq}_{fecha_sel}"):
+            if not ya:
+                ws_r.append_row([eq, fecha_sel, g_eq, g_cpu])
+                st.success("Guardado")
+
+# =========================
+# 📊 TABLA
 # =========================
 with tab2:
     if df_res.empty:
@@ -116,14 +147,14 @@ with tab2:
             pos = r["Pos"]
 
             if pos == 1:
-                bg = "#d4edda"
+                bg = "#2ecc71"
             elif pos >= len(df)-2:
-                bg = "#f8d7da"
+                bg = "#e74c3c"
             else:
-                bg = "white"
+                bg = "#111"
 
             filas += f"""
-            <tr style='background:{bg}'>
+            <tr style='background:{bg};color:white'>
                 <td>{pos}</td>
                 <td>{bandera_html(r['Equipo'])}</td>
                 <td>{r['Pts']}</td>
@@ -136,7 +167,7 @@ with tab2:
 
         html = f"""
         <html>
-        <body style="color:black;">
+        <body style="background:#0e1117;color:white;">
         <table style="width:100%;border-collapse:collapse;">
         <tr>
         <th>#</th><th>Equipo</th><th>Pts</th><th>PJ</th><th>GF</th><th>GC</th><th>DG</th>
@@ -150,7 +181,7 @@ with tab2:
         components.html(html, height=800)
 
 # =========================
-# ⚽ GOLEADORES (CON BANDERAS)
+# ⚽ GOLEADORES (BLANCO)
 # =========================
 with tab3:
     if df_gol.empty:
@@ -162,7 +193,7 @@ with tab3:
         filas = ""
         for _, r in df_rank.iterrows():
             filas += f"""
-            <tr>
+            <tr style='color:white'>
                 <td>{r['Jugador']}</td>
                 <td>{bandera_html(r['Equipo'])}</td>
                 <td>⚽ {r['Goles']}</td>
@@ -171,7 +202,7 @@ with tab3:
 
         html = f"""
         <html>
-        <body style="color:black;">
+        <body style="background:#0e1117;color:white;">
         <table style="width:100%;">
         <tr><th>Jugador</th><th>Equipo</th><th>Goles</th></tr>
         {filas}
