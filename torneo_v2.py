@@ -16,35 +16,40 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(
 )
 client = gspread.authorize(creds)
 
-# --- EQUIPOS ---
+# --- EQUIPOS (48) ---
 equipos = [
-    "Argentina","Brasil","España","Francia","Italia","Alemania",
-    "Portugal","Inglaterra","Holanda","Bélgica",
-    "Uruguay","Colombia","México","Chile","Perú",
-    "Estados Unidos","Canadá","Japón","Corea","Australia",
-    "Marruecos","Nigeria","Senegal","Camerún","Ghana",
-    "Croacia","Suiza","Dinamarca","Suecia","Noruega"
+"Polonia","Irlanda","Checa","Rumania","Georgia","Turquía","Albania","Corea",
+"Mali","Portugal","Escocia","Brasil","Japón","Marruecos","Noruega","Dinamarca",
+"Suiza","Argentina","Francia","Inglaterra","Suecia","Costa de Marfil","Finlandia","Colombia",
+"Canadá","Bosnia","Croacia","Gales","México","Países Bajos","Austria","Italia",
+"Australia","Argelia","Arabia Saudita","Ucrania","Nigeria","Uruguay","Grecia","Congo",
+"Serbia","Estados Unidos","Bélgica","Surinam","Ecuador","Hungría","Kosovo","Eslovaquia"
 ]
 
 fechas = [f"Fecha {i+1}" for i in range(20)]
-cpu = "CPU"
 
 # --- BANDERAS ---
 def bandera_html(nombre):
     codigos = {
-        "Argentina":"ar","Brasil":"br","España":"es","Francia":"fr","Italia":"it","Alemania":"de",
-        "Portugal":"pt","Inglaterra":"gb-eng","Holanda":"nl","Bélgica":"be",
-        "Uruguay":"uy","Colombia":"co","México":"mx","Chile":"cl","Perú":"pe",
-        "Estados Unidos":"us","Canadá":"ca","Japón":"jp","Corea":"kr","Australia":"au",
-        "Marruecos":"ma","Nigeria":"ng","Senegal":"sn","Camerún":"cm","Ghana":"gh",
-        "Croacia":"hr","Suiza":"ch","Dinamarca":"dk","Suecia":"se","Noruega":"no"
+        "Argentina":"ar","Brasil":"br","Francia":"fr","Italia":"it",
+        "Portugal":"pt","Inglaterra":"gb-eng","Países Bajos":"nl","Bélgica":"be",
+        "Colombia":"co","México":"mx","Estados Unidos":"us","Canadá":"ca",
+        "Japón":"jp","Corea":"kr","Australia":"au","Marruecos":"ma",
+        "Nigeria":"ng","Costa de Marfil":"ci","Croacia":"hr","Suiza":"ch",
+        "Dinamarca":"dk","Suecia":"se","Noruega":"no","Polonia":"pl",
+        "Irlanda":"ie","Checa":"cz","Rumania":"ro","Georgia":"ge",
+        "Turquía":"tr","Albania":"al","Mali":"ml","Escocia":"gb-sct",
+        "Gales":"gb-wls","Bosnia":"ba","Grecia":"gr","Congo":"cd",
+        "Serbia":"rs","Ecuador":"ec","Hungría":"hu","Kosovo":"xk",
+        "Eslovaquia":"sk","Austria":"at","Argelia":"dz","Arabia Saudita":"sa",
+        "Ucrania":"ua","Uruguay":"uy","Surinam":"sr","Finlandia":"fi"
     }
     code = codigos.get(nombre)
     if code:
         return f"<img src='https://flagcdn.com/w20/{code}.png'> {nombre}"
     return nombre
 
-# --- LOAD SHEET ---
+# --- LOAD ---
 def load_sheet():
     sh = client.open(SHEET_NAME)
 
@@ -60,11 +65,8 @@ def load_sheet():
         ws_g = sh.add_worksheet("liga_goleadores", 1000, 10)
         ws_g.append_row(["Equipo","Jugador","Goles","Fecha"])
 
-    records_r = ws_r.get_all_records()
-    records_g = ws_g.get_all_records()
-
-    df_r = pd.DataFrame(records_r) if records_r else pd.DataFrame(columns=["Equipo","Fecha","GolesEquipo","GolesCPU"])
-    df_g = pd.DataFrame(records_g) if records_g else pd.DataFrame(columns=["Equipo","Jugador","Goles","Fecha"])
+    df_r = pd.DataFrame(ws_r.get_all_records())
+    df_g = pd.DataFrame(ws_g.get_all_records())
 
     return df_r, df_g, ws_r, ws_g
 
@@ -79,16 +81,19 @@ df_res, df_gol, ws_r, ws_g = load_sheet()
 
 tab1, tab2, tab3 = st.tabs(["📅 Partidos", "📊 Tabla", "⚽ Goleadores"])
 
-# --- TAB 1 ---
+# =========================
+# 📅 PARTIDOS (ONEFOOTBALL)
+# =========================
 with tab1:
-    fecha_sel = st.selectbox("Fecha", fechas)
+    fecha_sel = st.selectbox("Seleccionar fecha", fechas)
 
-    faltan = len(equipos) - len(df_res[df_res["Fecha"] == fecha_sel])
-    st.markdown(f"### 📊 {fecha_sel} — {faltan} sin cargar")
-
-    total = len(equipos)
     cargados = len(df_res[df_res["Fecha"] == fecha_sel])
-    st.progress(int((cargados/total)*100))
+    total = len(equipos)
+    progreso = int((cargados/total)*100)
+
+    st.markdown(f"### 📅 {fecha_sel}")
+    st.progress(progreso)
+    st.caption(f"{cargados}/{total} partidos cargados")
 
     for eq in equipos:
         match = df_res[(df_res["Equipo"] == eq) & (df_res["Fecha"] == fecha_sel)]
@@ -97,49 +102,59 @@ with tab1:
         g1 = int(match.iloc[0]["GolesEquipo"]) if ya else 0
         g2 = int(match.iloc[0]["GolesCPU"]) if ya else 0
 
-        color = "#d4edda" if ya else "#ffe6e6"
-        borde = "#28a745" if ya else "#dc3545"
+        color = "#e8f5e9" if ya else "#ffebee"
 
+        # TARJETA
         st.markdown(f"""
-        <div style='background:{color};border-left:6px solid {borde};padding:8px;border-radius:8px;margin-bottom:5px'>
-        <b>{bandera_html(eq)} vs 🤖 CPU</b>
+        <div style='
+        background:{color};
+        border-radius:12px;
+        padding:10px;
+        margin-bottom:8px;
+        box-shadow:0 2px 5px rgba(0,0,0,0.1);
+        color:black;
+        '>
+        <div style='display:flex;justify-content:space-between;align-items:center;'>
+            <div>{bandera_html(eq)}</div>
+            <div style='font-size:18px;'><b>{g1} - {g2}</b></div>
+            <div>🤖 CPU</div>
+        </div>
         </div>
         """, unsafe_allow_html=True)
 
         c1, c2, c3 = st.columns([1,1,1])
-        g_eq = c1.number_input("",0,20,g1,key=f"{eq}_{fecha_sel}_1")
-        g_cpu = c2.number_input("",0,20,g2,key=f"{eq}_{fecha_sel}_2")
+        g_eq = c1.number_input("⚽",0,20,g1,key=f"{eq}_{fecha_sel}_1")
+        g_cpu = c2.number_input("🤖",0,20,g2,key=f"{eq}_{fecha_sel}_2")
 
-        if c3.button("💾", key=f"{eq}_{fecha_sel}_save"):
+        if c3.button("Guardar", key=f"{eq}_{fecha_sel}"):
             if not ya:
                 ws_r.append_row([eq, fecha_sel, g_eq, g_cpu])
                 st.success("Guardado")
 
-        # --- GOLEADORES ---
-        with st.expander("⚽ Goleadores"):
+        # GOLEADORES
+        jugadores = df_gol[df_gol["Equipo"]==eq]["Jugador"].dropna().unique().tolist()
 
-            jugadores_existentes = df_gol[df_gol["Equipo"]==eq]["Jugador"].dropna().unique().tolist()
+        busqueda = st.text_input("Jugador", key=f"bus_{eq}_{fecha_sel}")
+        sugerencias = [j for j in jugadores if busqueda.lower() in j.lower()] if busqueda else jugadores
+        sugerencias = sugerencias[:5]
 
-            busqueda = st.text_input("Buscar jugador", key=f"bus_{eq}_{fecha_sel}")
+        col1, col2, col3 = st.columns([2,1,1])
 
-            sugerencias = [j for j in jugadores_existentes if busqueda.lower() in j.lower()] if busqueda else jugadores_existentes
-            sugerencias = sugerencias[:5]
+        sel = col1.selectbox("Sugerencias", [""]+sugerencias, key=f"sug_{eq}_{fecha_sel}")
+        jugador = sel if sel else busqueda
 
-            col1, col2, col3 = st.columns([2,1,1])
+        goles = col2.number_input("G",1,10,1,key=f"g_{eq}_{fecha_sel}")
 
-            jugador_sel = col1.selectbox("Sugerencias", [""]+sugerencias, key=f"sug_{eq}_{fecha_sel}")
-            jugador_final = jugador_sel if jugador_sel else busqueda
+        if col3.button("⚽", key=f"gol_{eq}_{fecha_sel}"):
+            if jugador:
+                jugador = jugador.title()
+                for _ in range(goles):
+                    ws_g.append_row([eq, jugador, 1, fecha_sel])
+                st.success(f"{jugador} x{goles}")
 
-            goles = col2.number_input("Goles",1,10,1,key=f"gol_{eq}_{fecha_sel}")
-
-            if col3.button("⚽", key=f"golbtn_{eq}_{fecha_sel}"):
-                if jugador_final:
-                    jugador_final = jugador_final.strip().title()
-                    for _ in range(goles):
-                        ws_g.append_row([eq, jugador_final, 1, fecha_sel])
-                    st.success(f"{jugador_final} x{goles}")
-
-# --- TAB 2 ---
+# =========================
+# 📊 TABLA
+# =========================
 with tab2:
     stats = {e:{"PJ":0,"Pts":0,"GF":0,"GC":0} for e in equipos}
 
@@ -163,27 +178,63 @@ with tab2:
     df = df.reset_index().rename(columns={"index":"Equipo"})
     df.insert(0,"Pos",range(1,len(df)+1))
 
-    # Colores
-    def color_bar(pos):
+    df["Equipo"] = df["Equipo"].apply(bandera_html)
+
+    filas = []
+    for i,row in df.iterrows():
+        pos = row["Pos"]
+
         if pos == 1:
-            return "#2ecc71"
+            fondo = "#d4edda"
         elif pos >= len(df)-2:
-            return "#e74c3c"
-        return "transparent"
+            fondo = "#f8d7da"
+        else:
+            fondo = "white"
 
-    df.insert(0," ", df["Pos"].apply(lambda p: f"<div style='width:4px;height:20px;background:{color_bar(p)}'></div>"))
+        filas.append(f"""
+        <tr style='background:{fondo}'>
+            <td>{pos}</td>
+            <td>{row['Equipo']}</td>
+            <td>{row['Pts']}</td>
+            <td>{row['PJ']}</td>
+            <td>{row['GF']}</td>
+            <td>{row['GC']}</td>
+        </tr>
+        """)
 
-    st.markdown(df.to_html(escape=False,index=False), unsafe_allow_html=True)
+    tabla_html = f"""
+    <table style='width:100%;border-collapse:collapse'>
+    <tr>
+    <th>#</th><th>Equipo</th><th>Pts</th><th>PJ</th><th>GF</th><th>GC</th>
+    </tr>
+    {''.join(filas)}
+    </table>
+    """
 
-# --- TAB 3 ---
+    st.markdown(tabla_html, unsafe_allow_html=True)
+
+# =========================
+# ⚽ GOLEADORES
+# =========================
 with tab3:
     if not df_gol.empty:
         df_rank = df_gol.groupby(["Jugador","Equipo"])["Goles"].sum().reset_index()
         df_rank = df_rank.sort_values("Goles",ascending=False)
 
         st.markdown("## 🔥 Top 10")
-        top10 = df_rank.head(10)
-        st.dataframe(top10, use_container_width=True)
+
+        for _,r in df_rank.head(10).iterrows():
+            st.markdown(f"""
+            <div style='
+            background:#f8f9fa;
+            padding:8px;
+            border-radius:10px;
+            margin-bottom:5px;
+            color:black;
+            '>
+            <b>{r['Jugador']}</b> ({r['Equipo']}) — ⚽ {r['Goles']}
+            </div>
+            """, unsafe_allow_html=True)
 
         st.markdown("## 📋 Todos")
         st.dataframe(df_rank, use_container_width=True)
