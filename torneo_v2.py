@@ -75,29 +75,19 @@ def load_sheet():
 st.set_page_config(layout="centered")
 st.title("🏆 Liga vs CPU")
 
-if st.button("🔄 Actualizar"):
-    st.rerun()
-
 df_res, df_gol, ws_r, ws_g = load_sheet()
 
 tab1, tab2, tab3 = st.tabs(["📅 Partidos", "📊 Tabla", "⚽ Goleadores"])
 
 # =========================
-# 📅 PARTIDOS (FINAL)
+# 📅 PARTIDOS
 # =========================
 with tab1:
     fecha_sel = st.selectbox("Fecha", fechas)
 
     cargados = len(df_res[df_res["Fecha"] == fecha_sel]) if not df_res.empty else 0
-    total = len(equipos)
-
-    st.progress(int((cargados/total)*100))
-    st.caption(f"{cargados}/{total} partidos cargados")
-
-    # autocompletar
-    lista_jugadores = []
-    if not df_gol.empty and "Jugador" in df_gol.columns:
-        lista_jugadores = sorted(df_gol["Jugador"].dropna().unique().tolist())
+    st.progress(int((cargados/len(equipos))*100))
+    st.caption(f"{cargados}/{len(equipos)} partidos cargados")
 
     for eq in equipos:
         match = df_res[(df_res["Equipo"] == eq) & (df_res["Fecha"] == fecha_sel)] if not df_res.empty else pd.DataFrame()
@@ -108,26 +98,9 @@ with tab1:
 
         color = "#d4edda" if ya else "#f8d7da"
 
-        # 🔥 TARJETA PRO
         st.markdown(f"""
-        <div style='
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        background:{color};
-        padding:10px;
-        border-radius:10px;
-        color:black;
-        '>
-
-        <div>
-        <b>{bandera_html(eq)} vs 🤖 CPU</b>
-        </div>
-
-        <div style='font-size:22px;font-weight:700'>
-        {g1} - {g2}
-        </div>
-
+        <div style='background:{color};padding:10px;border-radius:10px;color:black;text-align:center'>
+        {bandera_html(eq)} <b>{g1}-{g2}</b> 🤖 CPU
         </div>
         """, unsafe_allow_html=True)
 
@@ -141,17 +114,11 @@ with tab1:
                 ws_r.append_row([eq, fecha_sel, g_eq, g_cpu])
                 st.rerun()
 
-        # GOLEADORES PRO
+        # GOLEADORES
         with st.expander("⚽ Goleadores"):
-            sugerencias = ", ".join(lista_jugadores[:10]) if lista_jugadores else ""
+            texto = st.text_input("", key=f"gol_{eq}_{fecha_sel}")
 
-            texto = st.text_input(
-                "Ej: Haaland x3, Messi x2",
-                key=f"gol_{eq}_{fecha_sel}",
-                placeholder=f"Sugerencias: {sugerencias}"
-            )
-
-            if st.button("Guardar goles", key=f"savegol_{eq}_{fecha_sel}"):
+            if st.button("Guardar", key=f"savegol_{eq}_{fecha_sel}"):
                 if texto:
                     partes = texto.split(",")
 
@@ -169,20 +136,20 @@ with tab1:
                         for _ in range(cant):
                             ws_g.append_row([eq, nombre, 1, fecha_sel])
 
-                    st.success("Goleadores guardados")
                     st.rerun()
 
 # =========================
-# 📊 TABLA (TUYA)
+# 📊 TABLA
 # =========================
 with tab2:
     if df_res.empty:
         st.info("Sin datos")
     else:
-        stats = {e:{"PJ":0,"Pts":0,"GF":0,"GC":0} for e in equipos}
+        equipos_unicos = sorted(set(equipos))
+        stats = {e:{"PJ":0,"Pts":0,"GF":0,"GC":0} for e in equipos_unicos}
 
         for _, r in df_res.iterrows():
-            eq = str(r["Equipo"]).strip()
+            eq = str(r["Equipo"]).strip().title()
             if eq not in stats:
                 continue
 
@@ -243,13 +210,23 @@ with tab2:
         components.html(html, height=800)
 
 # =========================
-# ⚽ GOLEADORES (TUYO)
+# ⚽ GOLEADORES
 # =========================
 with tab3:
     if df_gol.empty:
         st.info("Sin goleadores")
     else:
-        df_rank = df_gol.groupby(["Jugador","Equipo"])["Goles"].sum().reset_index()
+        equipo_filtro = st.selectbox(
+            "Filtrar por equipo",
+            ["Todos"] + sorted(df_gol["Equipo"].dropna().unique().tolist())
+        )
+
+        df_filtrado = df_gol.copy()
+
+        if equipo_filtro != "Todos":
+            df_filtrado = df_filtrado[df_filtrado["Equipo"] == equipo_filtro]
+
+        df_rank = df_filtrado.groupby(["Jugador","Equipo"])["Goles"].sum().reset_index()
         df_rank = df_rank.sort_values("Goles", ascending=False)
 
         filas = ""
