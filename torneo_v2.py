@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import streamlit.components.v1 as components
 
 # --- CONFIG ---
 SHEET_NAME = "Torneo CPU"
@@ -82,19 +83,18 @@ df_res, df_gol, ws_r, ws_g = load_sheet()
 tab1, tab2, tab3 = st.tabs(["📅 Partidos", "📊 Tabla", "⚽ Goleadores"])
 
 # =========================
-# 📅 PARTIDOS (MEJORADO)
+# 📅 PARTIDOS (FINAL)
 # =========================
 with tab1:
     fecha_sel = st.selectbox("Fecha", fechas)
 
-    # progreso
     cargados = len(df_res[df_res["Fecha"] == fecha_sel]) if not df_res.empty else 0
     total = len(equipos)
 
     st.progress(int((cargados/total)*100))
     st.caption(f"{cargados}/{total} partidos cargados")
 
-    # 🔥 lista de jugadores existentes (autocompletar)
+    # autocompletar
     lista_jugadores = []
     if not df_gol.empty and "Jugador" in df_gol.columns:
         lista_jugadores = sorted(df_gol["Jugador"].dropna().unique().tolist())
@@ -108,10 +108,26 @@ with tab1:
 
         color = "#d4edda" if ya else "#f8d7da"
 
+        # 🔥 TARJETA PRO
         st.markdown(f"""
-        <div style='background:{color};padding:10px;border-radius:10px;color:black'>
-        <b>{bandera_html(eq)} vs 🤖 CPU</b><br>
-        <span style='font-size:18px'><b>{g1} - {g2}</b></span>
+        <div style='
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        background:{color};
+        padding:10px;
+        border-radius:10px;
+        color:black;
+        '>
+
+        <div>
+        <b>{bandera_html(eq)} vs 🤖 CPU</b>
+        </div>
+
+        <div style='font-size:22px;font-weight:700'>
+        {g1} - {g2}
+        </div>
+
         </div>
         """, unsafe_allow_html=True)
 
@@ -125,9 +141,8 @@ with tab1:
                 ws_r.append_row([eq, fecha_sel, g_eq, g_cpu])
                 st.rerun()
 
-        # 🔥 GOLEADORES CON AUTOCOMPLETE
+        # GOLEADORES PRO
         with st.expander("⚽ Goleadores"):
-
             sugerencias = ", ".join(lista_jugadores[:10]) if lista_jugadores else ""
 
             texto = st.text_input(
@@ -137,7 +152,6 @@ with tab1:
             )
 
             if st.button("Guardar goles", key=f"savegol_{eq}_{fecha_sel}"):
-
                 if texto:
                     partes = texto.split(",")
 
@@ -159,7 +173,7 @@ with tab1:
                     st.rerun()
 
 # =========================
-# 📊 TABLA (NO TOCAR)
+# 📊 TABLA (TUYA)
 # =========================
 with tab2:
     if df_res.empty:
@@ -229,7 +243,7 @@ with tab2:
         components.html(html, height=800)
 
 # =========================
-# ⚽ GOLEADORES (BLANCO)
+# ⚽ GOLEADORES (TUYO)
 # =========================
 with tab3:
     if df_gol.empty:
